@@ -282,9 +282,13 @@ t('csv dedupe API handles Spanish split-name hospital sheets', () => {
     validRecords: 2,
     rejectedRows: 0,
     candidatePairs: 1,
+    candidateGroups: 1,
     skippedBuckets: [],
   });
   assert.equal(result.candidates[0].candidateType, 'candidate_duplicate');
+  assert.equal(result.groups.length, 1);
+  assert.equal(result.groups[0].memberCount, 2);
+  assert.equal(result.groups[0].sourceRefs.length, 2);
   assert.equal(result.candidates[0].recommendedAction, 'coordinator_review');
   assert.equal(result.candidates[0].confidence, 'confirmed');
   assert.equal(result.candidates[0].leftName, 'Ana Araujo');
@@ -307,14 +311,36 @@ t('csv dedupe ignores weak document placeholders as strong identifiers', () => {
 
   assert.equal(result.summary.validRecords, 2);
   assert.equal(result.summary.candidatePairs, 0);
+  assert.equal(result.summary.candidateGroups, 0);
+});
+
+t('csv dedupe groups one candidate person while preserving source refs', () => {
+  const result = dedupeCsvPersonCsvText([
+    'source,external_id,full_name,age,city,national_id,Fuentes',
+    'hospital-a,a-1,Ana Araujo,31,Caracas,V-12.345.678,radio desk',
+    'hospital-b,b-9,Ana Julia Araujo,31,Caracas,V12345678,field team',
+  ].join('\n'), {
+    eventId: 'venezuela-earthquakes-2026',
+    identifierCountryCode: 'VE',
+    sourceRefColumns: ['Fuentes'],
+  });
+
+  assert.equal(result.summary.candidatePairs, 1);
+  assert.equal(result.summary.candidateGroups, 1);
+  assert.deepEqual(result.groups[0].sources, ['hospital-a', 'hospital-b']);
+  assert.deepEqual(result.groups[0].sourceRefs, [
+    { source: 'hospital-a', externalId: 'a-1', rowNumber: 2, sourceDetails: { Fuentes: 'radio desk' } },
+    { source: 'hospital-b', externalId: 'b-9', rowNumber: 3, sourceDetails: { Fuentes: 'field team' } },
+  ]);
+  assert.equal(result.groups[0].recommendedAction, 'coordinator_review');
 });
 
 t('csv dedupe endpoint returns deterministic review candidates', async () => {
   const response = await handleCsvDedupeEndpointRequest({
     csvText: [
-      'Nombre,Apellido,CI,Edad,Hospital,Status',
-      'Ana,Araujo,V-12.345.678,31,Hospital Central,Confirmado',
-      'Ana Julia,Araujo,V12345678,31,Hospital Central,Por confirmar',
+      'Nombre,Apellido,CI,Edad,Hospital,Status,Fuentes',
+      'Ana,Araujo,V-12.345.678,31,Hospital Central,Confirmado,radio desk',
+      'Ana Julia,Araujo,V12345678,31,Hospital Central,Por confirmar,field team',
     ].join('\n'),
     eventId: 'venezuela-hospitalized-review',
     source: 'personas-hospitalizadas-csv',
@@ -323,12 +349,16 @@ t('csv dedupe endpoint returns deterministic review candidates', async () => {
     columns: {
       admin2: 'Hospital',
     },
+    sourceRefColumns: ['Fuentes'],
   });
 
   assert.equal(response.rowsRead, 2);
   assert.equal(response.validRows, 2);
   assert.equal(response.rejectedRows.length, 0);
   assert.equal(response.deterministic.candidatePairs, 1);
+  assert.equal(response.deterministic.candidateGroups, 1);
+  assert.equal(response.deterministic.groups[0].memberCount, 2);
+  assert.deepEqual(response.deterministic.groups[0].sourceRefs[0].sourceDetails, { Fuentes: 'radio desk' });
   assert.equal(response.deterministic.candidates[0].method, 'identifier');
   assert.equal(response.deterministic.candidates[0].recommendedAction, 'coordinator_review');
   assert.equal(response.deterministic.candidates[0].left.displayName, 'Ana Araujo');

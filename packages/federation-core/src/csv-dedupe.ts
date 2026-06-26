@@ -38,11 +38,13 @@ export interface CsvPersonInputOptions {
   defaultStatus?: PersonStatus;
   statusMap?: Record<string, PersonStatus>;
   columns?: CsvPersonColumnMapping;
+  sourceRefColumns?: string[];
 }
 
 export interface CsvPersonRecordRef {
   rowNumber: number;
   record: FederatedPersonRecord;
+  sourceDetails?: Record<string, string>;
 }
 
 export interface CsvPersonParseSuccess extends CsvPersonRecordRef {
@@ -106,17 +108,58 @@ export interface CsvDuplicateReviewRow {
   recommendedAction: 'coordinator_review';
 }
 
+export interface CsvCandidatePersonGroupMember {
+  rowNumber: number;
+  id: string;
+  source: string;
+  externalId: string;
+  externalUrl: string;
+  displayName: string;
+  age?: number | null;
+  admin1?: string | null;
+  admin2?: string | null;
+  status: PersonStatus;
+  sourceDetails?: Record<string, string>;
+}
+
+export interface CsvCandidatePersonGroup {
+  groupId: string;
+  groupType: 'candidate_person_group';
+  memberCount: number;
+  candidatePairCount: number;
+  sources: string[];
+  sourceRefs: Array<{
+    source: string;
+    externalId: string;
+    rowNumber: number;
+    sourceDetails?: Record<string, string>;
+  }>;
+  representative: {
+    displayName: string;
+    age?: number | null;
+    admin1?: string | null;
+    admin2?: string | null;
+  };
+  confidence: PersonMatchResult['confidence'];
+  maxScore: number;
+  methods: PersonMatchResult['method'][];
+  members: CsvCandidatePersonGroupMember[];
+  recommendedAction: 'coordinator_review';
+}
+
 export interface CsvPersonDedupeSummary {
   rowsRead: number;
   validRecords: number;
   rejectedRows: number;
   candidatePairs: number;
+  candidateGroups: number;
   skippedBuckets: CsvSkippedBucket[];
 }
 
 export interface CsvPersonDedupeRunResult {
   summary: CsvPersonDedupeSummary;
   candidates: CsvDuplicateReviewRow[];
+  groups: CsvCandidatePersonGroup[];
   rejectedRows: CsvPersonParseFailure[];
   sourceColumns: string[];
 }
@@ -187,6 +230,29 @@ function cell(row: Record<string, unknown>, field: CsvPersonColumnField, columns
   }
 
   return undefined;
+}
+
+function valueForHeader(row: Record<string, unknown>, header: string): string | undefined {
+  const direct = cleanCell(row[header]);
+  if (direct) return direct;
+  const normalized = normalizeHeader(header);
+  for (const [candidateHeader, value] of Object.entries(row)) {
+    if (normalizeHeader(candidateHeader) === normalized) return cleanCell(value);
+  }
+  return undefined;
+}
+
+function sourceDetailsFromRow(
+  row: Record<string, unknown>,
+  sourceRefColumns: readonly string[] | undefined,
+): Record<string, string> | undefined {
+  if (!sourceRefColumns || sourceRefColumns.length === 0) return undefined;
+  const details: Record<string, string> = {};
+  for (const column of sourceRefColumns) {
+    const value = valueForHeader(row, column);
+    if (value) details[column] = value;
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 function parseAge(value: string | undefined): number | null | undefined {
@@ -340,6 +406,7 @@ export function csvRowToPersonRecord(
       ok: true,
       rowNumber,
       record: FederatedPersonRecordSchema.parse(rawRecord),
+      sourceDetails: sourceDetailsFromRow(row, options.sourceRefColumns),
     };
   } catch (error) {
     return {
@@ -377,7 +444,7 @@ export function parseCsvPersonRecords(
 
   rows.forEach((row, index) => {
     const parsed = csvRowToPersonRecord(row as Record<string, unknown>, index + 2, options);
-    if (parsed.ok) records.push({ rowNumber: parsed.rowNumber, record: parsed.record });
+    if (parsed.ok) records.push(parsed);
     else rejectedRows.push(parsed);
   });
 
@@ -530,18 +597,165 @@ export function toCsvDuplicateReviewRow(candidate: CsvDuplicateCandidate): CsvDu
   };
 }
 
+class CandidateGroupUnionFind {
+  private readonly parent = new Map<number, number>();
+
+  add(value: number): void {
+    if (!this.parent.has(value)) this.parent.set(value, value);
+  }
+
+  find(value: number): number {
+    const parent = this.parent.get(value);
+    if (parent == null) {
+      this.add(value);
+      return value;
+    }
+    if (parent === value) return value;
+    const root = this.find(parent);
+    this.parent.set(value, root);
+    return root;
+  }
+
+  union(left: number, right: number): void {
+    const leftRoot = this.find(left);
+    const rightRoot = this.find(right);
+    if (leftRoot === rightRoot) return;
+    this.parent.set(Math.max(leftRoot, rightRoot), Math.min(leftRoot, rightRoot));
+  }
+}
+
+function confidenceRank(confidence: PersonMatchResult['confidence']): number {
+  switch (confidence) {
+    case 'confirmed':
+      return 5;
+    case 'likely':
+      return 4;
+    case 'possible':
+      return 3;
+    case 'review':
+      return 2;
+    case 'none':
+      return 1;
+  }
+}
+
+function bestConfidence(candidates: readonly CsvDuplicateCandidate[]): PersonMatchResult['confidence'] {
+  return candidates
+    .map((candidate) => candidate.result.confidence)
+    .sort((a, b) => confidenceRank(b) - confidenceRank(a))[0] ?? 'none';
+}
+
+function memberFromRecord(ref: CsvPersonRecordRef): CsvCandidatePersonGroupMember {
+  return {
+    rowNumber: ref.rowNumber,
+    id: ref.record.id,
+    source: ref.record.source,
+    externalId: ref.record.externalId,
+    externalUrl: ref.record.externalUrl,
+    displayName: ref.record.displayName,
+    age: ref.record.age,
+    admin1: ref.record.admin1,
+    admin2: ref.record.admin2,
+    status: ref.record.status,
+    ...(ref.sourceDetails ? { sourceDetails: ref.sourceDetails } : {}),
+  };
+}
+
+function representativeForMembers(
+  members: readonly CsvCandidatePersonGroupMember[],
+): CsvCandidatePersonGroup['representative'] {
+  const sorted = [...members].sort((a, b) => {
+    const completeness = (member: CsvCandidatePersonGroupMember) =>
+      Number(member.age != null) + Number(!!member.admin1) + Number(!!member.admin2);
+    return completeness(b) - completeness(a) || a.rowNumber - b.rowNumber;
+  });
+  const representative = sorted[0];
+  if (!representative) throw new Error('candidate group cannot be empty');
+  return {
+    displayName: representative.displayName,
+    age: representative.age,
+    admin1: representative.admin1,
+    admin2: representative.admin2,
+  };
+}
+
+export function groupCsvPersonCandidates(
+  records: readonly CsvPersonRecordRef[],
+  candidates: readonly CsvDuplicateCandidate[],
+): CsvCandidatePersonGroup[] {
+  const recordsByRow = new Map(records.map((record) => [record.rowNumber, record]));
+  const union = new CandidateGroupUnionFind();
+
+  for (const candidate of candidates) {
+    union.union(candidate.leftRow, candidate.rightRow);
+  }
+
+  const rowGroups = new Map<number, CsvPersonRecordRef[]>();
+  for (const candidate of candidates) {
+    for (const rowNumber of [candidate.leftRow, candidate.rightRow]) {
+      const record = recordsByRow.get(rowNumber);
+      if (!record) throw new Error(`candidate references unknown row ${rowNumber}`);
+      const root = union.find(rowNumber);
+      const group = rowGroups.get(root);
+      if (group) {
+        if (!group.some((member) => member.rowNumber === rowNumber)) group.push(record);
+      } else {
+        rowGroups.set(root, [record]);
+      }
+    }
+  }
+
+  return [...rowGroups.entries()]
+    .map(([root, refs]) => {
+      const members = refs
+        .map(memberFromRecord)
+        .sort((a, b) => a.rowNumber - b.rowNumber);
+      const groupCandidates = candidates.filter((candidate) => (
+        union.find(candidate.leftRow) === root && union.find(candidate.rightRow) === root
+      ));
+      const maxScore = Math.max(...groupCandidates.map((candidate) => candidate.result.score));
+      const methods = [...new Set(groupCandidates.map((candidate) => candidate.result.method))]
+        .sort((a, b) => a.localeCompare(b));
+      const sourceRefs = members.map((member) => ({
+        source: member.source,
+        externalId: member.externalId,
+        rowNumber: member.rowNumber,
+        ...(member.sourceDetails ? { sourceDetails: member.sourceDetails } : {}),
+      }));
+
+      return {
+        groupId: `candidate-person-group:${root}`,
+        groupType: 'candidate_person_group' as const,
+        memberCount: members.length,
+        candidatePairCount: groupCandidates.length,
+        sources: [...new Set(members.map((member) => member.source))].sort((a, b) => a.localeCompare(b)),
+        sourceRefs,
+        representative: representativeForMembers(members),
+        confidence: bestConfidence(groupCandidates),
+        maxScore,
+        methods,
+        members,
+        recommendedAction: 'coordinator_review' as const,
+      };
+    })
+    .sort((a, b) => b.maxScore - a.maxScore || b.memberCount - a.memberCount || a.groupId.localeCompare(b.groupId));
+}
+
 export function dedupeParsedCsvPersonRecords(
   parsed: ParseCsvPersonRecordsResult,
   options: CsvPersonDedupeIndexOptions = {},
 ): CsvPersonDedupeRunResult {
   const index = new CsvPersonDedupeIndex(options);
+  const rawCandidates: CsvDuplicateCandidate[] = [];
   const candidates: CsvDuplicateReviewRow[] = [];
 
   for (const record of parsed.records) {
     for (const candidate of index.add(record)) {
+      rawCandidates.push(candidate);
       candidates.push(toCsvDuplicateReviewRow(candidate));
     }
   }
+  const groups = groupCsvPersonCandidates(parsed.records, rawCandidates);
 
   return {
     summary: {
@@ -549,9 +763,11 @@ export function dedupeParsedCsvPersonRecords(
       validRecords: parsed.records.length,
       rejectedRows: parsed.rejectedRows.length,
       candidatePairs: candidates.length,
+      candidateGroups: groups.length,
       skippedBuckets: index.skippedBuckets(),
     },
     candidates,
+    groups,
     rejectedRows: parsed.rejectedRows,
     sourceColumns: parsed.sourceColumns,
   };

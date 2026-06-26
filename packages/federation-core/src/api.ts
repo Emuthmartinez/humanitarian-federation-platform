@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
   findCsvPersonDuplicateCandidates,
+  groupCsvPersonCandidates,
   parseCsvPersonRecords,
+  type CsvCandidatePersonGroup,
   type CsvDuplicateCandidate,
   type CsvPersonColumnMapping,
   type CsvPersonInputOptions,
@@ -75,6 +77,7 @@ export const CsvDedupeEndpointRequestSchema = z.object({
   ignoreStatus: z.boolean().default(false),
   defaultStatus: z.enum(PersonStatuses).optional(),
   statusMap: z.record(z.string(), z.enum(PersonStatuses)).optional(),
+  sourceRefColumns: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
   deterministic: DeterministicDedupeOptionsSchema,
   embedding: EmbeddingDedupeOptionsSchema,
 }).strict();
@@ -119,7 +122,9 @@ export interface CsvDedupeEndpointResponse {
   deterministic: {
     enabled: boolean;
     candidatePairs: number;
+    candidateGroups: number;
     candidates: CsvDedupeReviewCandidate[];
+    groups: CsvCandidatePersonGroup[];
   };
   embedding: {
     enabled: boolean;
@@ -217,15 +222,20 @@ export async function handleCsvDedupeEndpointRequest(
     defaultStatus: parsed.defaultStatus,
     statusMap: parsed.statusMap,
     columns: parsed.columns as CsvPersonColumnMapping,
+    sourceRefColumns: parsed.sourceRefColumns,
   };
   const parseResult = parseCsvPersonRecords(parsed.csvText, personOptions);
   const recordsByRowNumber = new Map(parseResult.records.map((record) => [record.rowNumber, record]));
 
-  const deterministicCandidates = parsed.deterministic.enabled
+  const rawDeterministicCandidates = parsed.deterministic.enabled
     ? findCsvPersonDuplicateCandidates(parseResult.records, {
       maxBucketSize: parsed.deterministic.maxBucketSize,
       minScore: parsed.deterministic.minScore,
-    }).map(deterministicCandidateToReview)
+    })
+    : [];
+  const deterministicCandidates = rawDeterministicCandidates.map(deterministicCandidateToReview);
+  const deterministicGroups = parsed.deterministic.enabled
+    ? groupCsvPersonCandidates(parseResult.records, rawDeterministicCandidates)
     : [];
 
   const embeddingResponse: CsvDedupeEndpointResponse['embedding'] = {
@@ -282,7 +292,9 @@ export async function handleCsvDedupeEndpointRequest(
     deterministic: {
       enabled: parsed.deterministic.enabled,
       candidatePairs: deterministicCandidates.length,
+      candidateGroups: deterministicGroups.length,
       candidates: deterministicCandidates,
+      groups: deterministicGroups,
     },
     embedding: embeddingResponse,
   };

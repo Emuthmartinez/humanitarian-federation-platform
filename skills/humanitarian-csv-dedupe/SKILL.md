@@ -30,6 +30,7 @@ wants duplicate review candidates from this repository.
      --event-id local-event \
      --source partner-sheet \
      --output review-candidates.csv \
+     --groups-output candidate-person-groups.json \
      --rejects rejected-rows.csv
    ```
 
@@ -56,7 +57,9 @@ wants duplicate review candidates from this repository.
      --identifier-country-code VE \
      --ignore-status \
      --column admin2="Hospital" \
+     --source-ref-column Fuentes \
      --output review-candidates.csv \
+     --groups-output candidate-person-groups.json \
      --rejects rejected-rows.csv
    ```
 
@@ -70,11 +73,17 @@ wants duplicate review candidates from this repository.
      --output review-candidates.csv
    ```
 
-7. Hosted APIs should call `dedupeCsvPersonCsvText(csvText, options)` to return
+7. Use `candidate-person-groups.json` when the reviewer wants one candidate
+   person with all contributing source rows preserved. The group file contains
+   `sourceRefs` and `members`; it is still advisory, not a confirmed merge.
+   Use `--source-ref-column` for restricted provenance columns that need to stay
+   attached to group members.
+
+8. Hosted APIs should call `dedupeCsvPersonCsvText(csvText, options)` to return
    the same JSON review queue as the CLI. Keep that endpoint authenticated,
    size-limited, and coordinator/partner restricted.
 
-8. Hand back counts, output paths, rejected-row counts, and any oversized-block
+9. Hand back counts, output paths, rejected-row counts, and any oversized-block
    warning. Do not paste candidate rows into chat unless the operator explicitly
    requests a restricted sample.
 

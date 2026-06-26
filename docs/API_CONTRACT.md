@@ -60,6 +60,7 @@ returns the same review queue produced by the local CLI. Implementations can use
     "validRecords": 5808,
     "rejectedRows": 0,
     "candidatePairs": 412,
+    "candidateGroups": 319,
     "skippedBuckets": []
   },
   "candidates": [
@@ -83,6 +84,52 @@ returns the same review queue produced by the local CLI. Implementations can use
       "recommendedAction": "coordinator_review"
     }
   ],
+  "groups": [
+    {
+      "groupId": "candidate-person-group:42",
+      "groupType": "candidate_person_group",
+      "memberCount": 2,
+      "candidatePairCount": 1,
+      "sources": ["hospital-a", "hospital-b"],
+      "sourceRefs": [
+        { "source": "hospital-a", "externalId": "a-1", "rowNumber": 42 },
+        { "source": "hospital-b", "externalId": "b-9", "rowNumber": 318 }
+      ],
+      "representative": {
+        "displayName": "Private review name",
+        "age": 31,
+        "admin2": "Private review locality"
+      },
+      "confidence": "likely",
+      "maxScore": 0.91,
+      "methods": ["name_age_locality"],
+      "members": [
+        {
+          "rowNumber": 42,
+          "id": "hospital-a:a-1",
+          "source": "hospital-a",
+          "externalId": "a-1",
+          "externalUrl": "https://local.invalid/federation-csv/a-1",
+          "displayName": "Private review name",
+          "age": 31,
+          "admin2": "Private review locality",
+          "status": "unknown"
+        },
+        {
+          "rowNumber": 318,
+          "id": "hospital-b:b-9",
+          "source": "hospital-b",
+          "externalId": "b-9",
+          "externalUrl": "https://local.invalid/federation-csv/b-9",
+          "displayName": "Private review name variant",
+          "age": 31,
+          "admin2": "Private review locality",
+          "status": "unknown"
+        }
+      ],
+      "recommendedAction": "coordinator_review"
+    }
+  ],
   "rejectedRows": []
 }
 ```
@@ -92,6 +139,11 @@ numbers, but must not include raw national IDs, passport numbers, contact
 details, private notes, raw photo hashes, precise coordinates, or child
 protection details. API clients must treat every row as advisory; they must not
 merge, resolve, delete, or publish identity claims without coordinator review.
+Groups are candidate person review clusters only. `sourceRefs` preserve source
+traceability while reviewers decide whether the grouped rows really describe one
+person. API callers can pass `sourceRefColumns` for restricted provenance
+columns that should be copied into `sourceRefs[].sourceDetails` rather than used
+as canonical federation source ids.
 
 ## Batch CSV Embedding Dedupe
 

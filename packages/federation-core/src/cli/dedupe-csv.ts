@@ -1,21 +1,23 @@
 #!/usr/bin/env node
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream, writeFileSync } from 'node:fs';
 import { parse } from 'csv-parse';
 import process from 'node:process';
 import type { Writable } from 'node:stream';
 import {
   CsvPersonDedupeIndex,
   csvRowToPersonRecord,
+  groupCsvPersonCandidates,
   toCsvDuplicateReviewRow,
   type CsvDuplicateCandidate,
   type CsvPersonColumnField,
   type CsvPersonColumnMapping,
-  type CsvPersonParseFailure,
+  type CsvPersonRecordRef,
 } from '../csv-dedupe.js';
 
 interface CliOptions {
   inputPath: string | null;
   outputPath: string | null;
+  groupsOutputPath: string | null;
   rejectsPath: string | null;
   eventId?: string;
   source?: string;
@@ -25,6 +27,7 @@ interface CliOptions {
   maxBucketSize?: number;
   minScore?: number;
   columns: CsvPersonColumnMapping;
+  sourceRefColumns: string[];
   help: boolean;
 }
 
@@ -80,6 +83,7 @@ function usage(): string {
     '',
     'Options:',
     '  --output <path>                    Write candidate review CSV to a file instead of stdout',
+    '  --groups-output <path>             Write grouped candidate people to restricted JSON',
     '  --rejects <path>                   Write rejected row numbers and validation errors',
     '  --event-id <id>                    Default event id when the CSV has no event column',
     '  --source <source>                  Default source when the CSV has no source column',
@@ -89,6 +93,7 @@ function usage(): string {
     '  --max-bucket-size <n>              Skip candidate scoring for oversized blocks (default 1000)',
     '  --min-score <n>                    Include non-related scored pairs at or above n (default 0.68)',
     '  --column <field=header>            Map a field to a CSV header; repeat as needed',
+    '  --source-ref-column <header>       Preserve a CSV column in group sourceRefs; repeat as needed',
     '  --help                            Show this help',
     '',
     `Column fields: ${[...COLUMN_FIELDS].join(', ')}`,
@@ -125,8 +130,10 @@ function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
     inputPath: null,
     outputPath: null,
+    groupsOutputPath: null,
     rejectsPath: null,
     columns: {},
+    sourceRefColumns: [],
     ignoreStatus: false,
     help: false,
   };
@@ -141,6 +148,12 @@ function parseArgs(args: string[]): CliOptions {
     if (arg === '--output') {
       const [value, nextIndex] = readOptionValue(args, index, '--output');
       options.outputPath = value;
+      index = nextIndex;
+      continue;
+    }
+    if (arg === '--groups-output') {
+      const [value, nextIndex] = readOptionValue(args, index, '--groups-output');
+      options.groupsOutputPath = value;
       index = nextIndex;
       continue;
     }
@@ -196,8 +209,18 @@ function parseArgs(args: string[]): CliOptions {
       index = nextIndex;
       continue;
     }
+    if (arg === '--source-ref-column') {
+      const [value, nextIndex] = readOptionValue(args, index, '--source-ref-column');
+      options.sourceRefColumns.push(value);
+      index = nextIndex;
+      continue;
+    }
     if (arg.startsWith('--column=')) {
       parseColumnMapping(arg.slice('--column='.length), options.columns);
+      continue;
+    }
+    if (arg.startsWith('--source-ref-column=')) {
+      options.sourceRefColumns.push(arg.slice('--source-ref-column='.length));
       continue;
     }
     if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
@@ -268,6 +291,8 @@ async function run(): Promise<void> {
   let validRows = 0;
   let rejectedRows = 0;
   let candidatePairs = 0;
+  const records: CsvPersonRecordRef[] = [];
+  const rawCandidates: CsvDuplicateCandidate[] = [];
 
   writeCsvLine(output, CANDIDATE_HEADERS);
   if (rejects) writeCsvLine(rejects, ['row', 'error']);
@@ -290,6 +315,7 @@ async function run(): Promise<void> {
       identifierCountryCode: options.identifierCountryCode,
       ignoreStatus: options.ignoreStatus,
       columns: options.columns,
+      sourceRefColumns: options.sourceRefColumns,
     });
 
     if (!parsed.ok) {
@@ -299,11 +325,28 @@ async function run(): Promise<void> {
     }
 
     validRows += 1;
+    records.push(parsed);
     const candidates = index.add(parsed);
     for (const candidate of candidates) {
+      rawCandidates.push(candidate);
       candidatePairs += 1;
       writeCsvLine(output, candidateValues(candidate));
     }
+  }
+
+  const groups = groupCsvPersonCandidates(records, rawCandidates);
+  if (options.groupsOutputPath) {
+    writeFileSync(options.groupsOutputPath, `${JSON.stringify({
+      summary: {
+        rowsRead,
+        validRecords: validRows,
+        rejectedRows,
+        candidatePairs,
+        candidateGroups: groups.length,
+        skippedBuckets: index.skippedBuckets(),
+      },
+      groups,
+    }, null, 2)}\n`, 'utf8');
   }
 
   await closeStream(output, !!options.outputPath);
@@ -316,9 +359,11 @@ async function run(): Promise<void> {
     `Valid records: ${validRows}`,
     `Rejected rows: ${rejectedRows}`,
     `Candidate pairs: ${candidatePairs}`,
+    `Candidate groups: ${groups.length}`,
     `Skipped oversized blocks: ${skippedBuckets.length}`,
     `Output: ${options.outputPath ?? 'stdout'}`,
   ];
+  if (options.groupsOutputPath) summary.push(`Groups: ${options.groupsOutputPath}`);
   if (options.rejectsPath) summary.push(`Rejects: ${options.rejectsPath}`);
   if (skippedBuckets[0]) {
     summary.push(`Largest skipped block: ${skippedBuckets[0].size} rows (${skippedBuckets[0].key})`);

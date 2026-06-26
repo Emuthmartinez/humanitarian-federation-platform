@@ -70,11 +70,13 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
   --event-id local-event \
   --source partner-sheet \
   --output review-candidates.csv \
+  --groups-output candidate-person-groups.json \
   --rejects rejected-rows.csv
 ```
 
 Hosted APIs can call `dedupeCsvPersonCsvText` with the same options to return a
-JSON review queue matching the CLI output.
+JSON review queue matching the CLI output, including candidate person groups
+that preserve per-row source references.
 
 ## Repository Layout
 

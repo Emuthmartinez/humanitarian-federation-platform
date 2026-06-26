@@ -16,6 +16,8 @@
 - **Public projection:** whitelisted view that drops private fields.
 - **Candidate duplicate:** a deterministic or embedding-assisted match result
   requiring review.
+- **Candidate person group:** an advisory cluster of candidate duplicate rows
+  with source references preserved for coordinator review.
 - **Partner badge:** a domain-bound trust signal with scopes and freshness.
 
 ## Identity Model
@@ -25,6 +27,7 @@ it. Records can be:
 
 - singletons
 - candidate duplicates
+- candidate person groups for review
 - coordinator-merged clusters
 - split back out after a bad merge
 - status-conflicted across sources

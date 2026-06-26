@@ -18,6 +18,7 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
   --source volunteer-sheet \
   --identifier-country-code VE \
   --output review-candidates.csv \
+  --groups-output candidate-person-groups.json \
   --rejects rejected-rows.csv
 ```
 
@@ -27,6 +28,14 @@ The candidate CSV includes row numbers, source-aware ids, names, score,
 confidence, method, reason, and `recommended_action=coordinator_review`.
 It does not include raw national IDs, passport numbers, contact details, notes,
 photo hashes, or private locations.
+
+The group JSON clusters connected candidate rows into `candidate_person_group`
+objects. Each group preserves `sourceRefs` so reviewers can see which source
+rows contributed to the candidate person without treating the group as a
+confirmed merge.
+Use `--source-ref-column` for restricted provenance columns, such as `Fuentes`,
+that should stay attached to group members but should not become the canonical
+federation `source`.
 
 ## Expected Columns
 
@@ -64,7 +73,9 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- personas.csv \
   --identifier-country-code VE \
   --ignore-status \
   --column admin2="Hospital" \
+  --source-ref-column Fuentes \
   --output review-candidates.csv \
+  --groups-output candidate-person-groups.json \
   --rejects rejected-rows.csv
 ```
 
@@ -104,5 +115,6 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
 
 Hosted instances can call `dedupeCsvPersonCsvText(csvText, options)` from
 `@humanitarian-federation/core` to return the same JSON review queue used by the
-CLI. Keep the endpoint authenticated, size-limited, and restricted to
+CLI, including `groups` for candidate people and `sourceRefs` for row/source
+traceability. Keep the endpoint authenticated, size-limited, and restricted to
 coordinators or verified partners.
