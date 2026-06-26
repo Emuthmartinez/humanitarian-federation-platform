@@ -7,6 +7,15 @@ import {
   SourcePartnerSchema,
   assessPartnerBadge,
   assessPartnerScopes,
+  buildCsvEmbeddingInputs,
+  csvRowToPersonRecord,
+  createVertexMultimodalEmbeddingProvider,
+  dedupeCsvPersonCsvText,
+  embedCsvRecords,
+  findCsvPersonDuplicateCandidates,
+  findEmbeddingDuplicateCandidates,
+  handleCsvDedupeEndpointRequest,
+  isSensitiveEmbeddingColumn,
   normalizeDomain,
   rankPersonCandidates,
   redactChildProtectionCase,
@@ -19,13 +28,20 @@ import {
 
 let pass = 0;
 let fail = 0;
+const tests = [];
 const t = (name, fn) => {
-  try {
-    fn();
-    pass += 1;
-  } catch (error) {
-    fail += 1;
-    console.error(`FAIL ${name}\n  ${error.message}`);
+  tests.push({ name, fn });
+};
+
+const runTests = async () => {
+  for (const { name, fn } of tests) {
+    try {
+      await fn();
+      pass += 1;
+    } catch (error) {
+      fail += 1;
+      console.error(`FAIL ${name}\n  ${error.message}`);
+    }
   }
 };
 
@@ -200,6 +216,172 @@ t('ranking keeps review candidates without merging them', () => {
   assert.equal(ranked[0].id, 'p3');
 });
 
+t('csv dedupe maps spreadsheet rows into advisory candidates', () => {
+  const parsed = [
+    csvRowToPersonRecord({
+      external_id: 'a-1',
+      full_name: 'Ana Julia Araujo',
+      age: '31',
+      city: 'Catia la Mar',
+      national_id: 'V-12.345.678',
+    }, 2, {
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'volunteer-sheet',
+      identifierCountryCode: 'VE',
+    }),
+    csvRowToPersonRecord({
+      external_id: 'b-1',
+      full_name: 'Ana Araujo',
+      age: '32',
+      city: 'Catia la Mar',
+      national_id: 'V12345678',
+    }, 3, {
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'volunteer-sheet',
+      identifierCountryCode: 'VE',
+    }),
+  ];
+
+  assert.equal(parsed.every((row) => row.ok), true);
+  const candidates = findCsvPersonDuplicateCandidates(parsed.filter((row) => row.ok));
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].leftRow, 2);
+  assert.equal(candidates[0].rightRow, 3);
+  assert.equal(candidates[0].result.confidence, 'confirmed');
+  assert.equal(candidates[0].result.reason, 'same strong identifier');
+});
+
+t('csv dedupe rejects invalid rows instead of silently defaulting', () => {
+  const parsed = csvRowToPersonRecord({
+    external_id: 'bad-1',
+    full_name: 'Invalid Age',
+    age: 'unknown',
+  }, 2);
+
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.errors.some((error) => error.includes('age "unknown" must be an integer')), true);
+});
+
+t('csv dedupe API handles Spanish split-name hospital sheets', () => {
+  const result = dedupeCsvPersonCsvText([
+    'Nombre,Apellido,CI,Edad,Hospital,Status',
+    'Ana,Araujo,V-12.345.678,31,Hospital Central,Confirmado',
+    'Ana Julia,Araujo,V12345678,31,Hospital Central,Por confirmar',
+  ].join('\n'), {
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'hospital-sheet',
+    identifierCountryCode: 'VE',
+    ignoreStatus: true,
+    columns: {
+      admin2: 'Hospital',
+    },
+  });
+
+  assert.deepEqual(result.summary, {
+    rowsRead: 2,
+    validRecords: 2,
+    rejectedRows: 0,
+    candidatePairs: 1,
+    skippedBuckets: [],
+  });
+  assert.equal(result.candidates[0].candidateType, 'candidate_duplicate');
+  assert.equal(result.candidates[0].recommendedAction, 'coordinator_review');
+  assert.equal(result.candidates[0].confidence, 'confirmed');
+  assert.equal(result.candidates[0].leftName, 'Ana Araujo');
+  assert.equal(result.candidates[0].rightName, 'Ana Julia Araujo');
+});
+
+t('csv dedupe ignores weak document placeholders as strong identifiers', () => {
+  const result = dedupeCsvPersonCsvText([
+    'Nombre,Apellido,CI,Edad,Hospital,Status',
+    'Ana,Araujo,NO PORTA DOCUMENTO,31,Hospital Central,Confirmado',
+    'Pedro,Gomez,NO PORTA DOCUMENTO,31,Hospital Central,Confirmado',
+  ].join('\n'), {
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'hospital-sheet',
+    ignoreStatus: true,
+    columns: {
+      admin2: 'Hospital',
+    },
+  });
+
+  assert.equal(result.summary.validRecords, 2);
+  assert.equal(result.summary.candidatePairs, 0);
+});
+
+t('csv dedupe endpoint returns deterministic review candidates', async () => {
+  const response = await handleCsvDedupeEndpointRequest({
+    csvText: [
+      'Nombre,Apellido,CI,Edad,Hospital,Status',
+      'Ana,Araujo,V-12.345.678,31,Hospital Central,Confirmado',
+      'Ana Julia,Araujo,V12345678,31,Hospital Central,Por confirmar',
+    ].join('\n'),
+    eventId: 'venezuela-hospitalized-review',
+    source: 'personas-hospitalizadas-csv',
+    identifierCountryCode: 'VE',
+    ignoreStatus: true,
+    columns: {
+      admin2: 'Hospital',
+    },
+  });
+
+  assert.equal(response.rowsRead, 2);
+  assert.equal(response.validRows, 2);
+  assert.equal(response.rejectedRows.length, 0);
+  assert.equal(response.deterministic.candidatePairs, 1);
+  assert.equal(response.deterministic.candidates[0].method, 'identifier');
+  assert.equal(response.deterministic.candidates[0].recommendedAction, 'coordinator_review');
+  assert.equal(response.deterministic.candidates[0].left.displayName, 'Ana Araujo');
+  assert.equal(response.deterministic.candidates[0].left.status, 'unknown');
+});
+
+t('csv dedupe endpoint returns embedding candidates through injected provider', async () => {
+  const response = await handleCsvDedupeEndpointRequest({
+    csvText: [
+      'Nombre,Apellido,CI,Edad,Hospital,Fuentes,Notas',
+      'Ana,Araujo,V-12.345.678,31,Hospital Central,private-source,private note',
+      'Ana Julia,Araujo,,31,Hospital Central,private-source,private note',
+      'Pedro,Gomez,,42,Hospital Norte,private-source,private note',
+    ].join('\n'),
+    eventId: 'venezuela-hospitalized-review',
+    source: 'personas-hospitalizadas-csv',
+    ignoreStatus: true,
+    columns: {
+      admin2: 'Hospital',
+    },
+    deterministic: {
+      enabled: false,
+    },
+    embedding: {
+      enabled: true,
+      includeColumns: ['Nombre', 'Apellido', 'Edad', 'Hospital'],
+      reviewThreshold: 0.72,
+      possibleThreshold: 0.78,
+      likelyThreshold: 0.95,
+    },
+  }, {
+    embeddingProvider: {
+      embed: async (inputs) => inputs.map((input) => ({
+        id: input.id,
+        vector: input.text.includes('Pedro') ? [0, 1] : [1, 0.03],
+        provider: 'fixture',
+        model: 'fixture-embedding',
+        dimension: 2,
+      })),
+    },
+  });
+
+  assert.equal(response.embedding.enabled, true);
+  assert.equal(response.embedding.embeddedRows, 3);
+  assert.deepEqual(response.embedding.excludedColumns, ['CI', 'Fuentes', 'Notas']);
+  assert.equal(response.embedding.candidatePairs, 1);
+  assert.equal(response.embedding.candidates[0].candidateType, 'embedding');
+  assert.equal(response.embedding.candidates[0].confidence, 'likely');
+  assert.equal(response.embedding.candidates[0].left.displayName, 'Ana Araujo');
+  assert.equal(JSON.stringify(response).includes('private note'), false);
+  assert.equal(JSON.stringify(response).includes('V-12.345.678'), false);
+});
+
 t('status summary tells an open local site to review another source resolution', () => {
   const own = redactPersonRecord(person({ id: 'own', status: 'missing', updatedAt: '2026-06-26T12:00:00Z' }));
   const other = redactPersonRecord(person({
@@ -317,5 +499,130 @@ t('restricted child scopes fail closed when scope is missing', () => {
   assert.deepEqual(decision.missingScopes, ['child:case:read_restricted']);
 });
 
+t('csv embedding inputs exclude sensitive columns before provider calls', () => {
+  const result = buildCsvEmbeddingInputs(
+    [
+      'external_id,display_name,admin1,phone,national_id,notesPrivate,lat',
+      'r1,Ana Julia Araujo,La Guaira,+58 555,V-12.345.678,private note,10.123',
+    ].join('\n'),
+    {
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'site-a',
+      externalIdColumn: 'external_id',
+    },
+  );
+
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rejectedRows.length, 0);
+  assert.equal(result.rows[0].text.includes('display_name: Ana Julia Araujo'), true);
+  assert.equal(result.rows[0].text.includes('admin1: La Guaira'), true);
+  for (const leak of ['+58 555', 'V-12.345.678', 'private note', '10.123']) {
+    assert.equal(result.rows[0].text.includes(leak), false, `leaked ${leak}`);
+  }
+  assert.equal(isSensitiveEmbeddingColumn('phone'), true);
+  assert.equal(isSensitiveEmbeddingColumn('national_id'), true);
+});
+
+t('csv embedding input rejects explicit sensitive include columns', () => {
+  assert.throws(() => buildCsvEmbeddingInputs(
+    [
+      'external_id,display_name,phone',
+      'r1,Ana Julia Araujo,+58 555',
+    ].join('\n'),
+    {
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'site-a',
+      externalIdColumn: 'external_id',
+      includeColumns: ['display_name', 'phone'],
+    },
+  ), /cannot include sensitive columns/);
+});
+
+t('embedding candidates stay advisory and event scoped', async () => {
+  const result = buildCsvEmbeddingInputs(
+    [
+      'external_id,display_name,admin1',
+      'r1,Ana Julia Araujo,La Guaira',
+      'r2,Ana Araujo,La Guaira',
+      'r3,Pedro Gomez,Caracas',
+    ].join('\n'),
+    {
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'site-a',
+      externalIdColumn: 'external_id',
+    },
+  );
+
+  const vectors = new Map([
+    ['r1', [1, 0]],
+    ['r2', [0.99, 0.1]],
+    ['r3', [0, 1]],
+  ]);
+  const records = await embedCsvRecords(result.rows, {
+    embed: async (inputs) => inputs.map((input) => ({
+      id: input.id,
+      vector: vectors.get(input.id.split(':').at(-1)) ?? [0, 1],
+      provider: 'fixture',
+      model: 'fixture-embedding',
+      dimension: 2,
+    })),
+  });
+
+  const candidates = findEmbeddingDuplicateCandidates(records, {
+    reviewThreshold: 0.72,
+    possibleThreshold: 0.78,
+    likelyThreshold: 0.95,
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].method, 'embedding');
+  assert.equal(candidates[0].confidence, 'likely');
+  assert.equal(candidates[0].id.endsWith(':r1'), true);
+  assert.equal(candidates[0].candidateId.endsWith(':r2'), true);
+  assert.equal(candidates[0].reason.includes('coordinator review'), true);
+});
+
+t('vertex multimodal embedding provider calls GCP predict endpoint', async () => {
+  let capturedUrl = '';
+  let capturedBody = null;
+  let capturedAuthorization = '';
+  const vector = Array.from({ length: 128 }, (_, index) => index / 1000);
+  const provider = createVertexMultimodalEmbeddingProvider({
+    projectId: 'gcp-project-1',
+    location: 'us-central1',
+    accessToken: 'test-token',
+    dimension: 128,
+    fetch: async (url, init) => {
+      capturedUrl = url;
+      capturedBody = JSON.parse(init.body);
+      capturedAuthorization = init.headers.Authorization;
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () => JSON.stringify({
+          predictions: [{ textEmbedding: vector }],
+        }),
+      };
+    },
+  });
+
+  const [result] = await provider.embed([{ id: 'row-1', text: 'display_name: Ana Julia Araujo' }]);
+
+  assert.equal(
+    capturedUrl,
+    'https://us-central1-aiplatform.googleapis.com/v1/projects/gcp-project-1/locations/us-central1/publishers/google/models/multimodalembedding%40001:predict',
+  );
+  assert.equal(capturedAuthorization, 'Bearer test-token');
+  assert.deepEqual(capturedBody.instances, [{ text: 'display_name: Ana Julia Araujo' }]);
+  assert.deepEqual(capturedBody.parameters, { dimension: 128 });
+  assert.equal(result.id, 'row-1');
+  assert.equal(result.provider, 'google-vertex-ai');
+  assert.equal(result.model, 'multimodalembedding@001');
+  assert.equal(result.dimension, 128);
+  assert.deepEqual(result.vector, vector);
+});
+
+await runTests();
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

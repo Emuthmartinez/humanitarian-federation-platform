@@ -14,7 +14,8 @@
 - **Coordination entity:** a hospital, shelter, donation center, supply hub,
   organization, public channel, or similar crisis resource.
 - **Public projection:** whitelisted view that drops private fields.
-- **Candidate duplicate:** a deterministic match result requiring review.
+- **Candidate duplicate:** a deterministic or embedding-assisted match result
+  requiring review.
 - **Partner badge:** a domain-bound trust signal with scopes and freshness.
 
 ## Identity Model
@@ -56,3 +57,15 @@ See [Child Protection Tracing](CHILD_PROTECTION_TRACING.md) for the full model.
 Every source write should include `sourceUpdatedAt` when possible. Instances
 should prefer newer source timestamps for idempotent updates and should expose
 change feeds so partner sites can poll for conflicts and resolutions.
+
+## Embedding-Assisted Review
+
+CSV uploads can be converted into source-aware embedding inputs for bulk review.
+Embedding similarity is an advisory signal, not a coordinator-confirmed merge.
+Instances should store any vectors, provider metadata, and thresholds as review
+artifacts separate from canonical records so bad candidates can be ignored or
+split without rewriting source claims.
+
+Embedding inputs must be built from public-safe columns only. Private contacts,
+national IDs, raw photo hashes, notes, precise coordinates, relationship-claim
+details, and other sensitive fields stay out of provider calls.
