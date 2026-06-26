@@ -1,0 +1,18 @@
+{
+  "name": "@humanitarian-federation/core",
+  "version": "0.1.0",
+  "description": "Reusable contracts and deterministic helpers for humanitarian federation instances.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node test/federation-core.test.mjs"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

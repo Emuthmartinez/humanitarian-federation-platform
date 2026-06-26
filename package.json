@@ -1,0 +1,16 @@
+{
+  "name": "humanitarian-federation-platform",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "pnpm --filter @humanitarian-federation/core build",
+    "test": "pnpm --filter @humanitarian-federation/core test",
+    "typecheck": "pnpm --filter @humanitarian-federation/core typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.9.0"
+  }
+}
