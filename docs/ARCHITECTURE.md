@@ -12,6 +12,7 @@ Instance site
 
 Platform contracts
   - event/source/person/entity/badge schemas
+  - restricted child tracing contracts and trust scopes
   - redaction, matching, status, trust helpers
   - adapter guidance
 
@@ -33,6 +34,11 @@ hosted ledger service.
 4. Public readers receive only a whitelisted projection.
 5. Matching helpers produce candidate duplicates and conflict summaries.
 6. Trusted coordinators confirm merges, splits, resolutions, and partner badges.
+
+Child protection tracing follows the same source-aware pattern, but public
+surfaces receive only intake signals or receipt status. Restricted child case
+reads require explicit child scopes, fresh badge verification, and instance
+authorization.
 
 ## Why Source-Aware
 

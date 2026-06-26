@@ -15,6 +15,8 @@ humanitarian-response sites should be able to use the same federation model.
   partners, and verified badges.
 - Provides a tested TypeScript core package with validation, redaction,
   duplicate scoring, status summaries, and badge trust checks.
+- Supports restricted child tracing for missing, unaccompanied, or separated
+  children without exposing public child whereabouts.
 - Keeps public projections safe by design: no precise coordinates, private
   contacts, national ID values, raw photo hashes, private notes, or secrets.
 - Treats duplicate matching as advisory. Coordinators confirm merges and
@@ -72,6 +74,7 @@ examples/respuesta-ve/     First-instance integration notes
 - [API Contract](docs/API_CONTRACT.md)
 - [Data Model](docs/DATA_MODEL.md)
 - [Trust Model](docs/TRUST_MODEL.md)
+- [Child Protection Tracing](docs/CHILD_PROTECTION_TRACING.md)
 - [Privacy Model](docs/PRIVACY_MODEL.md)
 - [Instance Guide](docs/INSTANCE_GUIDE.md)
 - [Adapters](docs/ADAPTERS.md)

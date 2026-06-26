@@ -1,4 +1,8 @@
 import type {
+  ChildProtectionCaseRecord,
+  ChildProtectionCaseStatus,
+  ChildRelationshipClaim,
+  ChildRelationshipClaimStatus,
   CoordinationEntity,
   EntityChannel,
   EntityNeed,
@@ -44,6 +48,28 @@ export interface PublicCoordinationEntity {
   updatedAt: string | null | undefined;
 }
 
+export type PublicChildProtectionCaseState = 'active' | 'closed';
+
+export interface PublicChildProtectionSignal {
+  eventId: string;
+  source: string;
+  intakeUrl: string;
+  state: PublicChildProtectionCaseState;
+  sourceUpdatedAt: string | null | undefined;
+  updatedAt: string | null | undefined;
+  disclosure: 'restricted_child_protection_case';
+}
+
+export interface PublicChildRelationshipClaimReceipt {
+  id: string;
+  eventId: string;
+  source: string;
+  status: ChildRelationshipClaimStatus;
+  submittedAt: string;
+  updatedAt: string | null | undefined;
+  disclosure: 'restricted_relationship_claim';
+}
+
 export function fuzzCoordinate(value: number | null | undefined, decimals = 3): number | null {
   if (value == null) return null;
   const factor = 10 ** decimals;
@@ -67,6 +93,34 @@ export function redactPersonRecord(record: FederatedPersonRecord): PublicPersonR
     updatedAt: record.updatedAt,
     hasStrongIdentifier: record.strongIdentifiers.length > 0,
     isMultiPerson: record.isMultiPerson,
+  };
+}
+
+export function publicChildProtectionCaseState(status: ChildProtectionCaseStatus): PublicChildProtectionCaseState {
+  return status === 'reunified' || status === 'transferred_to_authority' || status === 'closed' ? 'closed' : 'active';
+}
+
+export function redactChildProtectionCase(record: ChildProtectionCaseRecord): PublicChildProtectionSignal {
+  return {
+    eventId: record.eventId,
+    source: record.source,
+    intakeUrl: record.intakeUrl,
+    state: publicChildProtectionCaseState(record.status),
+    sourceUpdatedAt: record.sourceUpdatedAt,
+    updatedAt: record.updatedAt,
+    disclosure: 'restricted_child_protection_case',
+  };
+}
+
+export function redactChildRelationshipClaimReceipt(claim: ChildRelationshipClaim): PublicChildRelationshipClaimReceipt {
+  return {
+    id: claim.id,
+    eventId: claim.eventId,
+    source: claim.source,
+    status: claim.status,
+    submittedAt: claim.submittedAt,
+    updatedAt: claim.updatedAt,
+    disclosure: 'restricted_relationship_claim',
   };
 }
 

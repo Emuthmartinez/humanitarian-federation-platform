@@ -12,6 +12,12 @@ export interface BadgeAssessment {
   reasons: string[];
 }
 
+export interface ScopeAssessment extends BadgeAssessment {
+  allowed: boolean;
+  requiredScopes: PartnerScope[];
+  missingScopes: PartnerScope[];
+}
+
 export function normalizeDomain(raw: string): string | null {
   const input = raw.trim().toLowerCase();
   const urlish = /^[a-z][a-z0-9+.-]*:\/\//i.test(input) ? input : `https://${input}`;
@@ -86,5 +92,33 @@ export function assessPartnerBadge(
     verifiedAt: partner.badgeVerifiedAt,
     staleAfterDays,
     reasons: ['domain and timestamp are verified'],
+  };
+}
+
+export function assessPartnerScopes(
+  partner: SourcePartner,
+  domainInput: string,
+  requiredScopes: PartnerScope[],
+  opts: { now?: Date; staleAfterDays?: number } = {},
+): ScopeAssessment {
+  const badge = assessPartnerBadge(partner, domainInput, opts);
+  const granted = new Set(partner.scopes);
+  const missingScopes = requiredScopes.filter((scope) => !granted.has(scope));
+  const reasons = [...badge.reasons];
+
+  if (badge.state !== 'verified') {
+    reasons.push('partner badge is not currently verified');
+  }
+
+  if (missingScopes.length > 0) {
+    reasons.push(`partner is missing required scopes: ${missingScopes.join(', ')}`);
+  }
+
+  return {
+    ...badge,
+    allowed: badge.state === 'verified' && missingScopes.length === 0,
+    requiredScopes,
+    missingScopes,
+    reasons,
   };
 }

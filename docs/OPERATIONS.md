@@ -13,6 +13,9 @@ Instances that deploy APIs or sync workers should add their own runbooks.
 - Alert coordinators on status conflicts where one source marks a person found
   while another source still lists them missing.
 - Rotate partner keys and badge verification timestamps.
+- For child tracing, alert on repeated relationship claims, broad searches
+  across many children, stale child scopes, and any attempt to expose restricted
+  child fields publicly.
 
 ## Incident Response
 
@@ -23,6 +26,10 @@ If private data is exposed:
 3. Rotate affected credentials.
 4. Notify affected partners through private channels.
 5. Patch the redaction or authorization boundary before re-enabling.
+
+For child protection data exposure, also suspend child case reads for affected
+partners until a coordinator reviews access logs and rotates relevant partner
+keys.
 
 ## Release Checks
 

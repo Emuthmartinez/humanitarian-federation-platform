@@ -6,6 +6,8 @@
 - Generic platform architecture and instance guide.
 - `@humanitarian-federation/core` package with schemas, redaction, matching,
   status summaries, and badge trust checks.
+- Restricted child protection tracing contracts, public-safe redaction, and
+  scoped badge access checks.
 - Respuesta VE first-instance notes.
 
 ## Next
@@ -15,6 +17,7 @@
 - Add JSON Schema/OpenAPI exports generated from the TypeScript contracts.
 - Add a hosted source-aware ledger service.
 - Add coordinator merge/split/review UI.
+- Add restricted child case review UI and audit-log guidance.
 - Add partner key issuance and badge registry service.
 - Add sync workers and webhook/changefeed examples.
 

@@ -26,6 +26,11 @@ Current scopes:
 - `entity:write`
 - `status:write`
 - `badge:read`
+- `child:case:write`
+- `child:case:read_restricted`
+- `child:claim:write`
+- `child:claim:review`
+- `child:reunification:write`
 
 Instances may implement narrower local scopes, but public docs should never
 tell a partner to use a privilege they do not need.
@@ -45,6 +50,16 @@ A badge does not mean:
 - structural safety certification
 - source data is always correct
 - the site may publish private data
+
+## Child Protection Scopes
+
+Child protection scopes are restricted operational grants. A partner with
+ordinary `person:*` scopes must not receive child case reads unless it also has
+`child:case:read_restricted` and a fresh verified badge for the requesting
+domain. Relationship-claim review requires `child:claim:review`.
+
+Use `assessPartnerScopes` to fail closed when a verified badge is stale,
+unverified, or missing one of the required child scopes.
 
 ## Freshness
 

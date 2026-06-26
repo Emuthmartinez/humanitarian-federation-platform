@@ -52,6 +52,55 @@ Entities cover hospitals, shelters, aid centers, organizations, supply hubs,
 official channels, and other public crisis resources. Public coordinates should
 be fuzzed or omitted when exposing exact location would create risk.
 
+## Write Restricted Child Protection Case
+
+Child tracing cases are restricted case-management records, not public
+missing-person listings. Hosted instances can accept private records shaped by
+`ChildProtectionCaseRecordSchema`.
+
+```json
+{
+  "record": {
+    "eventId": "venezuela-earthquakes-2026",
+    "source": "child-helpdesk",
+    "externalId": "case-123",
+    "intakeUrl": "https://child-helpdesk.example/intake",
+    "status": "unaccompanied",
+    "age": 9,
+    "familyTracingConsentBasis": "child_protection_authority",
+    "riskFlags": ["trafficking_risk"]
+  }
+}
+```
+
+Private child names, care locations, family details, caseworker contacts,
+document identifiers, notes, and photo hashes must remain behind the restricted
+instance boundary.
+
+## Submit Restricted Relationship Claim
+
+Adults or authorities searching for a child submit restricted relationship
+claims. These are review inputs, not verified family relationships.
+
+```json
+{
+  "claim": {
+    "eventId": "venezuela-earthquakes-2026",
+    "source": "child-helpdesk",
+    "externalId": "claim-123",
+    "intakeUrl": "https://child-helpdesk.example/intake",
+    "claimantNamePrivate": "Private claimant",
+    "claimedRelationshipPrivate": "mother",
+    "claimantContactPrivate": "private contact",
+    "submittedAt": "2026-06-26T13:00:00Z"
+  }
+}
+```
+
+Public or claimant-facing receipts should use redacted receipt status only.
+Potential matches and child whereabouts require verified child protection
+review.
+
 ## Badge Lookup
 
 Badge lookup verifies a domain against a partner record and returns:
