@@ -30,3 +30,24 @@ Small volunteer groups often use spreadsheets. Instance adapters should:
 - quarantine weak identity rows
 - map columns into the native schema
 - avoid importing private notes into public projections
+
+For quick local duplicate review, use the deterministic CSV candidate generator
+documented in [CSV Dedupe](CSV_DEDUPE.md). Treat its output as a restricted
+coordinator review queue, not as automatic merge instructions.
+
+Hosted adapters can call `dedupeCsvPersonCsvText` to return the same restricted
+JSON review queue from an authenticated API. For messy text-heavy second-pass
+review, adapters can use `buildCsvEmbeddingInputs` to parse a CSV into
+source-aware, public-safe row text, `embedCsvRecords` to attach vectors, and
+`findEmbeddingDuplicateCandidates` to rank review candidates.
+
+The default CSV embedding filter excludes column names that look like private
+contacts, national IDs, notes, photo hashes, addresses, precise coordinates,
+claimant details, proofs, or other restricted data. If an operator explicitly
+tries to include a sensitive column, the helper fails closed instead of sending
+that value to an embedding provider.
+
+GCP-backed instances can use `createVertexMultimodalEmbeddingProvider` with
+Vertex AI `multimodalembedding@001`. Keep credentials server-side and pass the
+provider a short-lived access token or token callback; never put service account
+keys or partner API credentials in uploaded CSVs or public clients.

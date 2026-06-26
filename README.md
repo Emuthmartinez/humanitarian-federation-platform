@@ -14,7 +14,8 @@ humanitarian-response sites should be able to use the same federation model.
 - Defines source-aware records for people, crisis entities, needs, channels,
   partners, and verified badges.
 - Provides a tested TypeScript core package with validation, redaction,
-  duplicate scoring, status summaries, and badge trust checks.
+  duplicate scoring, deterministic CSV review-candidate generation, CSV
+  embedding review helpers, status summaries, and badge trust checks.
 - Supports restricted child tracing for missing, unaccompanied, or separated
   children without exposing public child whereabouts.
 - Keeps public projections safe by design: no precise coordinates, private
@@ -43,12 +44,37 @@ The package entry point is `@humanitarian-federation/core`:
 
 ```ts
 import {
+  buildCsvEmbeddingInputs,
+  createVertexMultimodalEmbeddingProvider,
+  dedupeCsvPersonCsvText,
+  embedCsvRecords,
   FederatedPersonRecordSchema,
+  findEmbeddingDuplicateCandidates,
   redactPersonRecord,
   scorePersonMatch,
   summarizePersonStatus,
 } from '@humanitarian-federation/core';
 ```
+
+CSV uploads can be embedded for bulk duplicate review with a server-side
+provider. For GCP, `createVertexMultimodalEmbeddingProvider` calls Vertex AI
+`multimodalembedding@001` with public-safe row text only; matches remain
+candidate duplicates for coordinator review.
+
+For a fast local spreadsheet pass, generate deterministic candidate duplicate
+pairs without sending data to a model provider:
+
+```bash
+pnpm --filter @humanitarian-federation/core build
+pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
+  --event-id local-event \
+  --source partner-sheet \
+  --output review-candidates.csv \
+  --rejects rejected-rows.csv
+```
+
+Hosted APIs can call `dedupeCsvPersonCsvText` with the same options to return a
+JSON review queue matching the CLI output.
 
 ## Repository Layout
 
@@ -76,6 +102,7 @@ examples/respuesta-ve/     First-instance integration notes
 - [Trust Model](docs/TRUST_MODEL.md)
 - [Child Protection Tracing](docs/CHILD_PROTECTION_TRACING.md)
 - [Privacy Model](docs/PRIVACY_MODEL.md)
+- [CSV Dedupe](docs/CSV_DEDUPE.md)
 - [Instance Guide](docs/INSTANCE_GUIDE.md)
 - [Adapters](docs/ADAPTERS.md)
 - [Operations](docs/OPERATIONS.md)

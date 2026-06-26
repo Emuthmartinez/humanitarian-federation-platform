@@ -46,6 +46,89 @@ candidate duplicates, not automatic merges.
 }
 ```
 
+## Batch CSV Deterministic Dedupe
+
+Hosted instances can expose a restricted coordinator or verified-partner endpoint
+that accepts a CSV upload, maps rows into `FederatedPersonRecordSchema`, and
+returns the same review queue produced by the local CLI. Implementations can use
+`dedupeCsvPersonCsvText` from `@humanitarian-federation/core`.
+
+```json
+{
+  "summary": {
+    "rowsRead": 5808,
+    "validRecords": 5808,
+    "rejectedRows": 0,
+    "candidatePairs": 412,
+    "skippedBuckets": []
+  },
+  "candidates": [
+    {
+      "candidateType": "candidate_duplicate",
+      "leftRow": 42,
+      "rightRow": 318,
+      "leftId": "hospital-sheet:csv-row-42",
+      "rightId": "hospital-sheet:csv-row-318",
+      "leftSource": "hospital-sheet",
+      "rightSource": "hospital-sheet",
+      "leftExternalId": "csv-row-42",
+      "rightExternalId": "csv-row-318",
+      "leftName": "Private review name",
+      "rightName": "Private review name variant",
+      "score": 1,
+      "confidence": "confirmed",
+      "method": "identifier",
+      "related": true,
+      "reason": "same strong identifier",
+      "recommendedAction": "coordinator_review"
+    }
+  ],
+  "rejectedRows": []
+}
+```
+
+This response is restricted review data. It may include names and source row
+numbers, but must not include raw national IDs, passport numbers, contact
+details, private notes, raw photo hashes, precise coordinates, or child
+protection details. API clients must treat every row as advisory; they must not
+merge, resolve, delete, or publish identity claims without coordinator review.
+
+## Batch CSV Embedding Dedupe
+
+Hosted instances can accept operator-uploaded CSVs, normalize public-safe row
+text, embed those rows through a server-side provider, and return candidate
+duplicates for review. Embedding results must not mutate canonical records or
+merge identities on their own.
+
+```json
+{
+  "acceptedRows": 142,
+  "rejectedRows": [
+    {
+      "rowNumber": 17,
+      "externalId": "csv-row-17",
+      "reason": "no public-safe columns available for embedding"
+    }
+  ],
+  "matches": [
+    {
+      "id": "venezuela-earthquakes-2026:site-a:r1",
+      "candidateId": "venezuela-earthquakes-2026:site-a:r9",
+      "eventId": "venezuela-earthquakes-2026",
+      "score": 0.93,
+      "method": "embedding",
+      "confidence": "likely",
+      "reason": "embedding similarity suggests a candidate duplicate for coordinator review"
+    }
+  ]
+}
+```
+
+For GCP-backed embedding, call `createVertexMultimodalEmbeddingProvider` on the
+server with a short-lived access token or token callback. The core helper uses
+Vertex AI `multimodalembedding@001` through the `:predict` endpoint and sends
+only the filtered row text.
+
 ## Write Coordination Entity
 
 Entities cover hospitals, shelters, aid centers, organizations, supply hubs,

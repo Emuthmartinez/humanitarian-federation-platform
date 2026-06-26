@@ -36,6 +36,18 @@ Missing-person records are high-risk. Public surfaces should prefer:
 They should avoid public identity documents, raw photos, phone numbers, private
 messages, or exact home/work locations.
 
+## Embedding Providers
+
+Treat external embedding APIs as processors that receive only minimized,
+public-safe text. Instance servers should filter CSV columns before any provider
+call and should never send private contacts, national IDs, raw photo hashes,
+private notes, precise coordinates, child protection details, credentials, or
+full raw source rows to a model provider.
+
+Embedding vectors and similarity scores are review artifacts. They may help
+rank candidate duplicates, but they must not create automatic merges, automatic
+status changes, or public identity claims.
+
 ## Child Protection Cases
 
 Child tracing records are more restricted than ordinary missing-person records.
