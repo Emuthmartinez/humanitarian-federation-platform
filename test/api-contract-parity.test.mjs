@@ -47,6 +47,25 @@ function includesDoc(path, needle) {
   assert.ok(text.includes(needle), `${path} should include "${needle}"`);
 }
 
+function assertRestrictedKeysAreNotPublic(endpoint) {
+  const shape = endpoint.responseShape;
+  if (!shape?.restrictedOnlyKeys) return;
+
+  const publicKeys = new Set([
+    ...(shape.requiredKeys ?? []),
+    ...(shape.allowedKeys ?? []),
+    ...(shape.allowedMatchKeys ?? []),
+  ]);
+
+  for (const key of shape.restrictedOnlyKeys) {
+    assert.equal(
+      publicKeys.has(key),
+      false,
+      `${endpointId(endpoint)} should not list restricted key ${key} as public`,
+    );
+  }
+}
+
 assert.equal(fixture.schemaVersion, 'hogar-api-parity-fixture/v1');
 assert.equal(fixture.referenceMode, 'read_only_public_reference');
 assert.equal(fixture.referenceHost, 'https://respuestave.org/api/v1');
@@ -78,6 +97,7 @@ const requiredEndpointIds = [
 ];
 
 for (const id of requiredEndpointIds) findEndpoint(id);
+for (const endpoint of endpoints) assertRestrictedKeysAreNotPublic(endpoint);
 
 const publicEndpoints = endpoints.filter((endpoint) => endpoint.auth === 'public');
 assert.ok(publicEndpoints.length > 0, 'fixture should include public endpoints');
