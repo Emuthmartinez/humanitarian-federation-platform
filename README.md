@@ -144,6 +144,7 @@ examples/respuesta-ve/     First-instance integration notes
 - [Public Snapshot](docs/PUBLIC_SNAPSHOT.md)
 - [Data Model](docs/DATA_MODEL.md)
 - [Trust Model](docs/TRUST_MODEL.md)
+- [Partner Security Review Model](docs/PARTNER_SECURITY_REVIEW.md)
 - [Child Protection Tracing](docs/CHILD_PROTECTION_TRACING.md)
 - [Privacy Model](docs/PRIVACY_MODEL.md)
 - [CSV Dedupe](docs/CSV_DEDUPE.md)

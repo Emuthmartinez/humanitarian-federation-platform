@@ -19,6 +19,9 @@ Respuesta VE is the first public instance proving this platform.
 
 For a Spanish partner-facing integration note, see
 [Handoff para Terremoto Venezuela](TERREMOTO_VENEZUELA_HANDOFF.md).
+For privacy/security due diligence, use the instance packet in
+`respuesta-ve/docs/REVISION_TECNICA_PRIVACIDAD.md` together with
+[`../../docs/PARTNER_SECURITY_REVIEW.md`](../../docs/PARTNER_SECURITY_REVIEW.md).
 
 ## Discord Intake Snippet
 
