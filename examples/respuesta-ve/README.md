@@ -113,8 +113,10 @@ publishing.
       "entity": {
         "kind": "donation_center",
         "name": "Centro de acopio Doral",
-        "estado": "Estados Unidos",
-        "municipio": "Doral, FL",
+        "audienceScope": "outside_venezuela",
+        "countryCode": "US",
+        "admin1": "Estados Unidos",
+        "admin2": "Doral, FL",
         "channels": [
           {
             "type": "supply_dropoff",
@@ -129,11 +131,15 @@ publishing.
     }
   ],
   "data": {
-    "countryCode": "US",
     "originalPost": "Texto, filas o enlaces originales para revision"
   }
 }
 ```
+
+Use canonical coordination-entity field names inside
+`canonicalCandidates[].entity`, such as `countryCode`, `admin1`, and `admin2`.
+Keep localized source labels like `estado` or `municipio` in the raw restricted
+payload only.
 
 After operators promote reviewed resources, partner frontends can render a
 card-ready public projection with `handleResourceViewEndpointRequest`:

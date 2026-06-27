@@ -180,9 +180,10 @@ restricted intake wrapper. Canonical coordination entities in the reusable
 platform schema also support `audienceScope` and ISO-3166 alpha-2 `countryCode`.
 If a hosted instance has not wired those fields through its local API/database
 yet, preserve the country in the restricted payload or native donation-center
-table and use the public entity geography fields for country/region (`admin1`
-or the instance-local `estado`) and city/state (`admin2` or `municipio`) during
-review.
+table while review workers map canonical candidates with `countryCode`,
+`admin1` for country/region, and `admin2` for city/state. Keep localized source
+labels such as `estado` or `municipio` only in raw restricted payloads or
+source-column metadata, not inside `canonicalCandidates`.
 
 These fields help operators and workers choose deterministic cleanup steps, but
 they remain advisory. Promote people through the authenticated person write path,
