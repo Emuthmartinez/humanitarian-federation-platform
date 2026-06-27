@@ -1,7 +1,6 @@
 # Architecture
 
-Humanitarian Federation Platform separates reusable federation logic from any
-single crisis website.
+Hogar separates reusable federation logic from any single crisis website.
 
 ## Layers
 

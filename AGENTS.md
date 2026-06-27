@@ -4,14 +4,15 @@ Guidance for AI coding agents and humans working in this repo.
 
 ## Project Overview
 
-Humanitarian Federation Platform is a public, reusable foundation for crisis
-data federation. It provides contracts and deterministic helpers that let
-independent public surfaces read/write humanitarian records while preserving
-source provenance, privacy boundaries, duplicate-review workflows, freshness
-signals, verified partner badges, and public snapshot failover.
+Hogar is a public, open-source, reusable foundation for crisis data federation.
+It provides contracts and deterministic helpers that let independent public
+surfaces read/write humanitarian records while preserving source provenance,
+privacy boundaries, duplicate-review workflows, freshness signals, verified
+partner badges, and public snapshot failover.
 
-The first instance is Respuesta VE for the June 2026 Venezuela earthquakes, but
-this repo must stay disaster-agnostic.
+"Hogar" is the project brand; the reusable core ships as the neutral npm package
+`@humanitarian-federation/core`. The first instance is Respuesta VE for the June
+2026 Venezuela earthquakes, but this repo must stay disaster-agnostic.
 
 ## Non-Negotiables
 
