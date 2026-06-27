@@ -6,7 +6,8 @@
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "build": "pnpm --filter @humanitarian-federation/core build",
-    "test": "pnpm run test:docs && pnpm --filter @humanitarian-federation/core test",
+    "test": "pnpm run test:docs && pnpm run test:api-contracts && pnpm --filter @humanitarian-federation/core test",
+    "test:api-contracts": "node test/api-contract-parity.test.mjs",
     "test:docs": "node test/docs-platform-boundary.test.mjs",
     "typecheck": "pnpm --filter @humanitarian-federation/core typecheck"
   },

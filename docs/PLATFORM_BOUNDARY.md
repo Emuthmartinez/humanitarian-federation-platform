@@ -30,6 +30,12 @@ Respuesta VE currently serves the first production Hogar-compatible API. That
 does not make the Respuesta VE frontend the platform identity, and it does not
 mean Hogar should absorb the instance repo in one move.
 
+Hogar now tracks that reference surface in
+[API Contract Inventory](API_CONTRACT_INVENTORY.md) and protects it with an
+offline parity fixture harness. The harness uses public-safe metadata captured
+from `respuestave.org/api/v1`; Respuesta VE remains read-only until a future
+hosted backend has parity, staging, security review, and cutover proof.
+
 For now:
 
 - `respuestave.org/api/v1` remains the stable production compatibility host.

@@ -37,6 +37,12 @@ Deliverables:
 - fixture list for parity tests
 - explicit privacy and authorization gates per endpoint family
 
+Current artifacts:
+
+- [API Contract Inventory](API_CONTRACT_INVENTORY.md)
+- `test/fixtures/api-parity/respuesta-ve-v1-contract.json`
+- `pnpm run test:api-contracts`
+
 ## Phase 2: Hosted API Skeleton
 
 Create a Hogar-owned hosted API package or app, such as `packages/hogar-api` or
@@ -75,6 +81,12 @@ Security gates:
 ## Phase 4: Parity Test Harness
 
 Build parity tests against the current Respuesta VE compatibility reference.
+
+The first harness is fixture-backed and offline by default. It validates the
+inventory captured in
+`test/fixtures/api-parity/respuesta-ve-v1-contract.json`; future hosted API
+packages should add live staging comparisons against the same contract before
+any production traffic moves.
 
 The harness should verify:
 

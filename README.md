@@ -45,6 +45,12 @@ backend extraction roadmap. Partner apps should keep using the stable Respuesta
 VE v1 host until Hogar has parity tests, a staging deployment, and an explicit
 cutover plan.
 
+The current v1 surfaces are tracked in the
+[API Contract Inventory](docs/API_CONTRACT_INVENTORY.md). Its fixture-backed
+parity harness uses public-safe reference metadata from Respuesta VE and runs
+with `pnpm run test:api-contracts`; it does not call authenticated production
+routes or require partner API keys.
+
 ## Quick Start
 
 ```bash
@@ -146,6 +152,7 @@ examples/respuesta-ve/     First-instance integration notes
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Contract](docs/API_CONTRACT.md)
+- [API Contract Inventory](docs/API_CONTRACT_INVENTORY.md)
 - [Platform Boundary](docs/PLATFORM_BOUNDARY.md)
 - [Hosted Backend Roadmap](docs/HOSTED_BACKEND_ROADMAP.md)
 - [Public Snapshot](docs/PUBLIC_SNAPSHOT.md)

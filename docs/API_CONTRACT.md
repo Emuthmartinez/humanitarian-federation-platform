@@ -9,6 +9,11 @@ This document names the generic v1 contract. Partner apps should not change API
 hosts until a Hogar-hosted backend has parity tests, staging proof, and an
 explicit cutover plan.
 
+For the current endpoint inventory and offline parity fixture, see
+[API Contract Inventory](API_CONTRACT_INVENTORY.md). The fixture harness keeps
+Respuesta VE read-only as the reference host and runs with
+`pnpm run test:api-contracts`.
+
 ## Public Data Intake
 
 Hosted instances can expose a public intake queue for volunteers, Discord users,
