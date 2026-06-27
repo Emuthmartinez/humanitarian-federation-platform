@@ -54,3 +54,12 @@ keys or partner API credentials in uploaded CSVs or public clients. The helper
 defaults to one instance per Vertex request and strict review thresholds because
 similar rows in the same crisis spreadsheet can have a high baseline vector
 similarity.
+
+## Public Snapshot Output
+
+Adapters should treat incoming formats as ingestion concerns only. After review,
+publish the cleaned public result through `buildPublicFederationSnapshot` so
+frontends and mirrors read one stable shape regardless of whether the source was
+CSV, Discord text, a partner API, a public website, or a hand-curated operator
+entry. Snapshot records are redacted projections plus advisory groups, not raw
+adapter payloads.

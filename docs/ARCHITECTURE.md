@@ -14,6 +14,7 @@ Platform contracts
   - event/source/person/entity/badge schemas
   - restricted child tracing contracts and trust scopes
   - redaction, matching, status, trust helpers
+  - public snapshot and mirror contract
   - adapter guidance
 
 Future hosted platform
@@ -34,6 +35,7 @@ hosted ledger service.
 4. Public readers receive only a whitelisted projection.
 5. Matching helpers produce candidate duplicates and conflict summaries.
 6. Trusted coordinators confirm merges, splits, resolutions, and partner badges.
+7. Instances can publish a hashable public snapshot for frontends and mirrors.
 
 Child protection tracing follows the same source-aware pattern, but public
 surfaces receive only intake signals or receipt status. Restricted child case
@@ -59,3 +61,12 @@ Each record keeps:
 Public projection is a whitelist. The platform never relies on "delete the
 private fields later" redaction. Private fields stay in instance storage and
 are omitted from public helpers by construction.
+
+## Availability Boundary
+
+Public snapshots are an availability layer, not a replacement for source-aware
+records. A mirror can keep the last verified `public-snapshot.json` available if
+the primary instance goes down, but clients still verify the publisher, sequence,
+content hash, and optional signature before trusting the artifact. Tombstones in
+the newest verified snapshot remove unsafe or withdrawn records from current
+public views.

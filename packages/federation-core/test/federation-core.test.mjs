@@ -9,6 +9,7 @@ import {
   assessPartnerBadge,
   assessPartnerScopes,
   buildCsvEmbeddingInputs,
+  buildPublicFederationSnapshot,
   csvRowToPersonRecord,
   createVertexMultimodalEmbeddingProvider,
   dedupeCsvPersonCsvText,
@@ -19,8 +20,10 @@ import {
   handleCsvDedupeEndpointRequest,
   handleGroupedPersonViewEndpointRequest,
   handlePublicDataIntakeEndpointRequest,
+  hashPublicSnapshotContent,
   isSensitiveEmbeddingColumn,
   normalizeDomain,
+  PublicFederationSnapshotSchema,
   rankPersonCandidates,
   redactChildProtectionCase,
   redactPublicDataIntakeSubmissionReceipt,
@@ -608,6 +611,115 @@ t('coordination entity schema validates public channels and private address', ()
   assert.equal(JSON.stringify(redacted).includes('private street address'), false);
   assert.equal(redacted.lat, 10.067);
   assert.equal(redacted.lng, -69.347);
+});
+
+t('public federation snapshot normalizes redacted records for mirrors', () => {
+  const event = {
+    id: 'venezuela-earthquakes-2026',
+    slug: 'venezuela-earthquakes-2026',
+    name: 'Venezuela Earthquakes 2026',
+    kind: 'earthquake',
+    countryCodes: ['ve'],
+    startedAt: '2026-06-24T00:00:00Z',
+    publicUrl: 'https://terremotovenezuela.org',
+  };
+  const publisher = SourcePartnerSchema.parse({
+    id: 'respuesta-ve',
+    name: 'Respuesta VE',
+    source: 'respuesta-ve',
+    publicUrl: 'https://terremotovenezuela.org',
+    verifiedDomains: ['terremotovenezuela.org'],
+    scopes: ['person:read', 'entity:read', 'badge:read'],
+    badgeVerifiedAt: '2026-06-26T00:00:00Z',
+  });
+  const entity = CoordinationEntitySchema.parse({
+    id: 'entity:hospital-central',
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'hospital-directory',
+    externalId: 'hospital-central',
+    sourceUrl: 'https://terremotovenezuela.app/resources/hospital-central',
+    kind: 'hospital',
+    name: 'Hospital Central',
+    lat: 10.06741,
+    lng: -69.34742,
+    addressPrivate: 'private street address',
+    channels: [{ type: 'website', url: 'https://hospital.example', isPrimary: true }],
+    needs: [{ category: 'medical_supplies', title: 'Gauze', urgency: 'high' }],
+    updatedAt: '2026-06-26T14:00:00Z',
+  });
+  const dedupeRun = dedupeCsvPersonCsvText([
+    'external_id,full_name,age,city,national_id,status',
+    'row-a,Ana Julia Araujo,31,Catia la Mar,V-12.345.678,missing',
+    'row-b,Ana Araujo,31,Catia la Mar,V12345678,found_safe',
+  ].join('\n'), {
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'hospital-sheet',
+    identifierCountryCode: 'VE',
+  });
+  const snapshot = buildPublicFederationSnapshot({
+    event,
+    publisher,
+    persons: [person()],
+    entities: [entity],
+    csvCandidatePersonGroups: dedupeRun.groups,
+    generatedAt: '2026-06-26T18:00:00Z',
+    defaultLocale: 'es-VE',
+    locales: ['es-VE'],
+    sequence: 7,
+    previousSnapshotHash: `sha256:${'0'.repeat(64)}`,
+    canonicalUrl: 'https://terremotovenezuela.org/api/v1/public-snapshot.json',
+    mirrors: [{ url: 'https://mirror.example/venezuela-earthquakes-2026/public-snapshot.json', role: 'mirror' }],
+    tombstones: [{
+      eventId: 'venezuela-earthquakes-2026',
+      recordKind: 'person',
+      recordId: 'person:withdrawn',
+      source: 'hospital-sheet',
+      externalId: 'old-row',
+      reason: 'privacy_risk',
+      removedAt: '2026-06-26T17:30:00Z',
+      publicNote: 'Withdrawn from the current public feed.',
+    }],
+  });
+
+  PublicFederationSnapshotSchema.parse(snapshot);
+  assert.equal(snapshot.schemaVersion, 'public-federation-snapshot/v1');
+  assert.equal(snapshot.defaultLocale, 'es-VE');
+  assert.deepEqual(snapshot.locales, ['es-VE']);
+  assert.equal(snapshot.publisher.badgeLabel, 'Socio de datos humanitarios federados');
+  assert.equal(snapshot.recordCounts.persons, 1);
+  assert.equal(snapshot.recordCounts.entities, 1);
+  assert.equal(snapshot.recordCounts.tombstones, 1);
+  assert.equal(snapshot.contentHash, hashPublicSnapshotContent(snapshot));
+  assert.match(snapshot.contentHash, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(snapshot.records.entities[0].lat, 10.067);
+  assert.equal(snapshot.records.entities[0].lng, -69.347);
+  const candidateGroup = snapshot.records.personGroups.find((group) => group.kind === 'candidate_duplicate');
+  assert.equal(candidateGroup?.recommendedAction, 'coordinator_review');
+  assert.equal(candidateGroup?.statusConflict, true);
+  assert.equal(candidateGroup?.warnings.some((warning) => warning.id === 'candidate_review_required'), true);
+  assert.equal(candidateGroup?.warnings.some((warning) => warning.message.includes('posible duplicado')), true);
+
+  const rebuilt = buildPublicFederationSnapshot({
+    event,
+    publisher,
+    persons: [person()],
+    entities: [entity],
+    csvCandidatePersonGroups: dedupeRun.groups,
+    generatedAt: '2026-06-26T18:00:00Z',
+    defaultLocale: 'es-VE',
+    locales: ['es-VE'],
+    sequence: 7,
+    previousSnapshotHash: `sha256:${'0'.repeat(64)}`,
+    canonicalUrl: 'https://terremotovenezuela.org/api/v1/public-snapshot.json',
+    mirrors: [{ url: 'https://mirror.example/venezuela-earthquakes-2026/public-snapshot.json', role: 'mirror' }],
+    tombstones: snapshot.records.tombstones,
+  });
+  assert.equal(rebuilt.contentHash, snapshot.contentHash);
+
+  const json = JSON.stringify(snapshot);
+  for (const leak of ['private phone', 'private note', '2160c2c66c6ce9db', 'V-12.345.678', 'V12345678', 'private street address']) {
+    assert.equal(json.includes(leak), false, `leaked ${leak}`);
+  }
 });
 
 t('coordination entity rejects lat without lng', () => {

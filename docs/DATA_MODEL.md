@@ -18,6 +18,9 @@
   requiring review.
 - **Candidate person group:** an advisory cluster of candidate duplicate rows
   with source references preserved for coordinator review.
+- **Public federation snapshot:** a redacted, hashable dataset containing
+  public persons, advisory person groups, entities, source metadata, mirrors,
+  and tombstones for frontend and failover reads.
 - **Partner badge:** a domain-bound trust signal with scopes and freshness.
 
 ## Identity Model
@@ -60,6 +63,19 @@ See [Child Protection Tracing](CHILD_PROTECTION_TRACING.md) for the full model.
 Every source write should include `sourceUpdatedAt` when possible. Instances
 should prefer newer source timestamps for idempotent updates and should expose
 change feeds so partner sites can poll for conflicts and resolutions.
+
+Public snapshots add an instance-level `sequence`, `generatedAt`, optional
+`previousSnapshotHash`, and deterministic `contentHash`. Mirrors should keep
+immutable copies by hash and expose only the newest verified sequence as their
+latest pointer.
+
+## Public Tombstones
+
+When a previously public record must leave the current feed, publish a
+tombstone instead of silently relying on consumers to notice absence. Tombstones
+name the public record id, kind, source, source-local external id when safe,
+removal reason, and removal timestamp. They do not expose private raw payloads
+or identifiers.
 
 ## Embedding-Assisted Review
 

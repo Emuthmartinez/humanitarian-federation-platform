@@ -139,6 +139,41 @@ poll the normal change feeds with a durable `since` cursor, for example
 `GET /api/v1/entities/changes?since=<last-seen-updatedAt>`. Public intake
 receipts are not the canonical feed; they are a sender-facing queue status.
 
+## Public Federation Snapshot
+
+Hosted instances can expose a redacted normalized dataset for public frontends
+and decentralized mirrors:
+
+```text
+GET /api/v1/public-snapshot.json
+Authorization: not required for public records
+```
+
+Implementations can use `buildPublicFederationSnapshot` from
+`@humanitarian-federation/core` after records have been validated, reviewed,
+redacted, and promoted. The response contains one stable shape for public person
+records, advisory person groups, coordination entities, public tombstones,
+source partner labels, mirror URLs, and a deterministic `contentHash`.
+Instances should set `defaultLocale` to the language already used by their
+public surface, for example `es-VE` for Terremoto Venezuela. Machine fields
+remain stable enums; human-facing labels, warning messages, source names, and
+public tombstone notes should be localized.
+
+The snapshot is designed for failover. Mirrors fetch the canonical URL, verify
+`contentHash` with `hashPublicSnapshotContent(snapshot)`, optionally verify a
+detached Ed25519 `signature`, and serve the newest trusted `sequence` if the
+primary provider is unavailable. Clients should reject hash mismatches and
+prefer the highest verified sequence rather than whichever mirror responds
+first.
+
+Person groups in the snapshot remain advisory unless their `kind` is
+`coordinator_confirmed`. A `candidate_duplicate` group must stay tied to
+`recommendedAction: "coordinator_review"` and must not trigger automatic merge,
+resolution, deletion, or identity collapse in client applications.
+
+See [Public Federation Snapshot](PUBLIC_SNAPSHOT.md) for the full shape and
+mirror rules.
+
 ## Write Person Record
 
 ```json
