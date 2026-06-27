@@ -4,6 +4,7 @@ import {
   ChildRelationshipClaimSchema,
   CoordinationEntitySchema,
   FederatedPersonRecordSchema,
+  PublicDataIntakeSubmissionRecordSchema,
   SourcePartnerSchema,
   assessPartnerBadge,
   assessPartnerScopes,
@@ -518,6 +519,41 @@ t('public intake accepts arbitrary unauthenticated JSON and returns a safe recei
   assert.equal(JSON.stringify(response.receipt).includes('+58 private phone'), false);
   assert.equal(JSON.stringify(response.receipt).includes('Ana Julia Araujo'), false);
   assert.equal(JSON.stringify(response.submission).includes('+58 private phone'), true);
+});
+
+t('public intake receipts can expose processing status without raw payload data', () => {
+  const response = handlePublicDataIntakeEndpointRequest({
+    source: 'rescue-map-upload',
+    kind: 'entity',
+    data: {
+      fileName: 'hospitales.csv',
+      rows: [{ name: 'Hospital Central', contact: '+58 private phone' }],
+    },
+  }, {
+    defaultEventId: 'venezuela-earthquakes-2026',
+    now: '2026-06-26T15:00:00Z',
+  });
+
+  const promoted = PublicDataIntakeSubmissionRecordSchema.parse({
+    ...response.submission,
+    updatedAt: '2026-06-26T15:05:00Z',
+    reviewStatus: 'promoted',
+    recommendedAction: 'canonical_record_created',
+    processedRecordKind: 'entity',
+    processedRecordId: 'entity:hospital-central',
+    processedRecordUrl: 'https://respuestave.org/api/v1/entities/entity:hospital-central',
+    processedAt: '2026-06-26T15:05:00Z',
+    publicReviewNote: 'Processed as a hospital/entity record.',
+  });
+  const receipt = redactPublicDataIntakeSubmissionReceipt(promoted);
+  const json = JSON.stringify(receipt);
+
+  assert.equal(receipt.status, 'promoted');
+  assert.equal(receipt.pollAfterSeconds, null);
+  assert.equal(receipt.processedRecord.kind, 'entity');
+  assert.equal(receipt.processedRecord.id, 'entity:hospital-central');
+  assert.equal(json.includes('Hospital Central'), false);
+  assert.equal(json.includes('+58 private phone'), false);
 });
 
 t('public intake accepts raw text and keeps receipts redacted', () => {

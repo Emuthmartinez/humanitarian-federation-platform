@@ -60,9 +60,12 @@ import {
 
 For a no-key public dropbox route, call `handlePublicDataIntakeEndpointRequest`
 from a hosted `POST /api/v1/public-intake` endpoint. It accepts arbitrary JSON,
-CSV text, pasted text, or URLs, stores the raw submission for restricted
-operator review, and returns a redacted receipt instead of publishing unverified
-data.
+CSV text, pasted text, URLs, or small typed file envelopes, stores the raw
+submission for restricted operator review, and returns a redacted receipt
+instead of publishing unverified data. Submitters poll
+`GET /api/v1/public-intake?id=<receipt-id>` for queue status; verified partners
+poll canonical change feeds such as `/api/v1/persons/changes?since=...` and
+`/api/v1/entities/changes?since=...` after operators promote records.
 
 CSV uploads can be embedded for bulk duplicate review with a server-side
 provider. For GCP, `createVertexMultimodalEmbeddingProvider` calls Vertex AI

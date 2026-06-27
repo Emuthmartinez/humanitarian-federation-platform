@@ -32,13 +32,36 @@ curl -X POST https://respuestave.org/api/v1/public-intake \
     "data": {
       "url": "https://example.org/sheet-or-post",
       "anything": "paste rows, lists, screenshots links, hospital needs, people, shelters, etc."
-    }
+    },
+    "files": [
+      {
+        "name": "hospitales.csv",
+        "type": "text/csv",
+        "text": "name,state\nHospital Central,Lara"
+      }
+    ]
   }'
 ```
 
 The endpoint does not require an API key. It returns a receipt only; the data
 goes into restricted operator review and is not published, merged, or treated as
-verified until it is processed.
+verified until it is processed. Poll the receipt until it is promoted, ignored,
+or marked spam:
+
+```bash
+curl -s "https://respuestave.org/api/v1/public-intake?id=<receipt-id>"
+```
+
+Once an operator promotes the submission into normalized public records,
+partners fetch the canonical truth through the normal cursor feeds:
+
+```bash
+curl -s "https://respuestave.org/api/v1/persons/changes?since=2026-06-27T00:00:00Z" \
+  -H "authorization: Bearer <partner-api-key>"
+
+curl -s "https://respuestave.org/api/v1/entities/changes?since=2026-06-27T00:00:00Z" \
+  -H "authorization: Bearer <partner-api-key>"
+```
 
 ## Boundary
 
