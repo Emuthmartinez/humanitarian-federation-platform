@@ -1,8 +1,14 @@
-# Humanitarian Federation Platform
+# Hogar
 
-Reusable contracts, deterministic helpers, and operating guidance for sites
-that need to federate crisis data across many public surfaces without creating
-duplicate people, stale records, or unsafe public disclosures.
+Hogar is an open-source platform for crisis data federation: reusable contracts,
+deterministic helpers, and operating guidance for sites that need to federate
+crisis data across many public surfaces without creating duplicate people, stale
+records, or unsafe public disclosures.
+
+One open home, many doors — each public surface keeps its own brand and audience
+while reading and writing the same source-aware records. The reusable core ships
+as the npm package `@humanitarian-federation/core`; "Hogar" is the project brand,
+and the package name stays neutral so the core can power any disaster response.
 
 The first live instance is **Respuesta VE**, a Venezuela earthquake-response
 site at [respuestave.org](https://respuestave.org). This repo is broader than
