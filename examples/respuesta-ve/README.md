@@ -15,6 +15,10 @@ Respuesta VE is the first public instance proving this platform.
   hubs, and current needs.
 - Verified partner badges.
 - No-key public data intake for volunteer submissions and scrape targets.
+- Public normalized snapshot for partner frontends and mirrors.
+
+For a Spanish partner-facing integration note, see
+[Handoff para Terremoto Venezuela](TERREMOTO_VENEZUELA_HANDOFF.md).
 
 ## Discord Intake Snippet
 
@@ -62,6 +66,22 @@ curl -s "https://respuestave.org/api/v1/persons/changes?since=2026-06-27T00:00:0
 curl -s "https://respuestave.org/api/v1/entities/changes?since=2026-06-27T00:00:00Z" \
   -H "authorization: Bearer <partner-api-key>"
 ```
+
+## Public Snapshot And Mirrors
+
+For public frontend handoff and provider failover, publish the redacted
+normalized snapshot:
+
+```bash
+curl -s "https://terremotovenezuela.org/api/v1/public-snapshot.json"
+```
+
+The snapshot should include public person records, advisory person groups that
+match the `/personas` card model, public coordination entities, source labels,
+mirror URLs, public tombstones, and a deterministic `contentHash`. Mirrors cache
+the latest verified sequence and can serve the same artifact if the primary
+provider goes down. Clients must keep `candidate_duplicate` groups as review
+candidates; they are not confirmed merges.
 
 ## Boundary
 

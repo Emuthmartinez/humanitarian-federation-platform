@@ -16,6 +16,8 @@ humanitarian-response sites should be able to use the same federation model.
 - Provides a tested TypeScript core package with validation, redaction,
   duplicate scoring, deterministic CSV review-candidate generation, CSV
   embedding review helpers, status summaries, and badge trust checks.
+- Builds hashable public federation snapshots so frontends and mirrors can pull
+  a normalized dataset even if the primary provider is unavailable.
 - Supports restricted child tracing for missing, unaccompanied, or separated
   children without exposing public child whereabouts.
 - Keeps public projections safe by design: no precise coordinates, private
@@ -45,11 +47,13 @@ The package entry point is `@humanitarian-federation/core`:
 ```ts
 import {
   buildCsvEmbeddingInputs,
+  buildPublicFederationSnapshot,
   createVertexMultimodalEmbeddingProvider,
   dedupeCsvPersonCsvText,
   embedCsvRecords,
   FederatedPersonRecordSchema,
   findEmbeddingDuplicateCandidates,
+  hashPublicSnapshotContent,
   handleCsvDedupeEndpointRequest,
   handlePublicDataIntakeEndpointRequest,
   redactPersonRecord,
@@ -66,6 +70,15 @@ instead of publishing unverified data. Submitters poll
 `GET /api/v1/public-intake?id=<receipt-id>` for queue status; verified partners
 poll canonical change feeds such as `/api/v1/persons/changes?since=...` and
 `/api/v1/entities/changes?since=...` after operators promote records.
+
+For provider failover and frontend handoff, publish a redacted normalized
+snapshot with `buildPublicFederationSnapshot` at a stable URL such as
+`/api/v1/public-snapshot.json`. The snapshot includes public person records,
+advisory person groups, entities, source metadata, tombstones, mirrors, and a
+deterministic `contentHash` that mirrors can verify before serving a last-good
+copy. Set `defaultLocale` to the public site's language, such as `es-VE`, so
+human-facing labels and warnings match the frontend while machine enums stay
+stable.
 
 CSV uploads can be embedded for bulk duplicate review with a server-side
 provider. For GCP, `createVertexMultimodalEmbeddingProvider` calls Vertex AI
@@ -112,6 +125,7 @@ examples/respuesta-ve/     First-instance integration notes
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Contract](docs/API_CONTRACT.md)
+- [Public Snapshot](docs/PUBLIC_SNAPSHOT.md)
 - [Data Model](docs/DATA_MODEL.md)
 - [Trust Model](docs/TRUST_MODEL.md)
 - [Child Protection Tracing](docs/CHILD_PROTECTION_TRACING.md)

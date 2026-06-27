@@ -10,6 +10,8 @@ Instances that deploy APIs or sync workers should add their own runbooks.
 - Keep public reads on redacted views or projection helpers.
 - Monitor rejected validation payloads.
 - Monitor stale source update clocks.
+- Monitor public snapshot generation, mirror fetch success, hash verification,
+  and sequence freshness.
 - Alert coordinators on status conflicts where one source marks a person found
   while another source still lists them missing.
 - Rotate partner keys and badge verification timestamps.
