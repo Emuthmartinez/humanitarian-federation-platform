@@ -4,18 +4,16 @@ The package defines contracts that a hosted instance can expose over HTTP. The
 current public proof is Respuesta VE's `/api/v1/*` routes; this document names
 the generic shape.
 
-## Public No-Key Data Intake
+## Public Data Intake
 
-Hosted instances can expose a no-API-key dropbox for volunteers, Discord users,
+Hosted instances can expose a public intake queue for volunteers, Discord users,
 partner forwards, and quick scrape targets:
 
 ```text
 POST /api/v1/public-intake
 Content-Type: application/json
-Authorization: not required
 
 GET /api/v1/public-intake?id=<receipt-id>
-Authorization: not required
 ```
 
 This endpoint accepts any JSON body, including arrays, arbitrary objects,
@@ -32,9 +30,35 @@ Recommended wrapped shape:
 ```json
 {
   "source": "discord:respuesta-ve",
+  "sourceRecordId": "discord:respuesta-ve:message-123",
+  "contentFingerprint": "sha256:...",
   "submittedBy": "@discord-user",
   "contact": "private reply contact if needed",
   "kind": "mixed",
+  "audienceScope": "in_venezuela",
+  "processingHints": {
+    "dedupeMode": "candidate_review_not_auto_merge",
+    "promotionPath": "/api/v1/persons",
+    "cleanupPipeline": [
+      "extract_rows",
+      "normalize_person",
+      "match_person",
+      "operator_promote_safe_records"
+    ]
+  },
+  "canonicalCandidates": [
+    {
+      "kind": "person",
+      "externalId": "discord:respuesta-ve:message-123:row-1",
+      "externalUrl": "https://source.example/message/123",
+      "record": {
+        "displayName": "Ana Araujo",
+        "age": 31,
+        "admin1": "La Guaira",
+        "status": "missing"
+      }
+    }
+  ],
   "note": "Please scrape this sheet and process the rows.",
   "data": {
     "sheet": "https://example.org/public-hospital-sheet",
@@ -87,7 +111,6 @@ Safe receipt:
   "eventId": "venezuela-earthquakes-2026",
   "source": "discord:respuesta-ve",
   "status": "received_for_review",
-  "authentication": "none_required",
   "submittedAt": "2026-06-26T15:00:00.000Z",
   "payloadFormat": "json",
   "submissionKind": "mixed",
@@ -128,10 +151,45 @@ a canonical public record, the receipt can expose only a safe pointer:
 The stored submission is restricted operator data. It may contain private
 contacts or raw fields supplied by the sender, but the receipt must not echo
 names, contacts, notes, document identifiers, exact coordinates, raw payload
-rows, or child protection details. No-key intake must still use rate limits,
+rows, or child protection details. Public intake must still use rate limits,
 size limits, logging, abuse review, and a non-public queue. Intake data is not a
 federated record until an operator validates, maps, redacts, deduplicates, and
 publishes it through the normal write paths.
+
+If a caller can provide cleanup hints, store them only in the restricted queue:
+
+- `sourceRecordId`: stable source reference for advisory grouping and review;
+  do not rely on it for retry idempotency unless the hosted instance documents
+  that behavior separately.
+- `contentFingerprint`: restricted hash for repeated upload grouping. Do not
+  publish or expose it in receipts.
+- `processingHints`: suggested extraction, normalization, dedupe, and promotion
+  path.
+- `canonicalCandidates`: caller-supplied person/entity/need candidates already
+  mapped toward the instance schema. Candidate records should use canonical
+  write-contract field names, such as `displayName` and `admin1`, instead of
+  localized source labels.
+
+Outside-country donation and resource leads should also travel as entity
+candidates. Map diaspora collection centers as `kind: "donation_center"` or
+`kind: "supply_hub"`, donation links as `channels.type: "donation_url"`,
+drop-off instructions as `channels.type: "supply_dropoff"`, and needed items
+as `needs` with categories such as `medical_supplies`, `food`, `water`,
+`shelter`, or `funds`. Include `audienceScope: "outside_venezuela"` in the
+restricted intake wrapper. Canonical coordination entities in the reusable
+platform schema also support `audienceScope` and ISO-3166 alpha-2 `countryCode`.
+If a hosted instance has not wired those fields through its local API/database
+yet, preserve the country in the restricted payload or native donation-center
+table while review workers map canonical candidates with `countryCode`,
+`admin1` for country/region, and `admin2` for city/state. Keep localized source
+labels such as `estado` or `municipio` only in raw restricted payloads or
+source-column metadata, not inside `canonicalCandidates`.
+
+These fields help operators and workers choose deterministic cleanup steps, but
+they remain advisory. Promote people through the authenticated person write path,
+coordination entities and needs through the entity write path, and keep medical
+patient details, raw photos, private contacts, and child-protection claims
+restricted unless a coordinator creates a safe public projection.
 
 Processed canonical data is fetched separately. Partners with read scopes should
 poll the normal change feeds with a durable `since` cursor, for example
@@ -146,7 +204,6 @@ and decentralized mirrors:
 
 ```text
 GET /api/v1/public-snapshot.json
-Authorization: not required for public records
 ```
 
 Implementations can use `buildPublicFederationSnapshot` from
@@ -296,6 +353,94 @@ columns, normalized ID columns, private notes, raw source text, and moderation
 notes. Conflict warnings remain advisory; clients must not present grouped rows
 as confirmed merges unless a coordinator has reviewed them.
 
+## Resource View Endpoint
+
+Hosted instances can expose a public-safe resource projection for hospitals,
+needs, shelters, acopio centers, donation links, organizations, public support
+channels, map-report need clusters, and safe hospital-patient signals:
+
+```text
+POST /api/v1/resources/view
+Content-Type: application/json
+Authorization: deployment-specific
+```
+
+Implementations can use `handleResourceViewEndpointRequest` from
+`@humanitarian-federation/core`. The endpoint accepts reviewed
+`CoordinationEntity` records plus already-public-safe resource records. It is
+not a raw-intake publisher; private contacts, private addresses, raw notes,
+content fingerprints, photo data, exact medical details, and raw payload rows
+must stay in the restricted review queue.
+
+```json
+{
+  "entities": [
+    {
+      "id": "entity:usa-doral-acopio",
+      "eventId": "venezuela-earthquakes-2026",
+      "source": "mapa-emergencia-rescate",
+      "externalId": "usa-doral-acopio",
+      "sourceUrl": "https://terremotovenezuela.app/apoyo-global",
+      "kind": "donation_center",
+      "name": "Centro de acopio Doral",
+      "audienceScope": "outside_venezuela",
+      "countryCode": "US",
+      "admin1": "Estados Unidos",
+      "admin2": "Doral, FL",
+      "channels": [
+        {
+          "type": "supply_dropoff",
+          "displayText": "Recibe insumos medicos, agua y comida",
+          "isPrimary": true
+        }
+      ],
+      "needs": [
+        { "category": "medical_supplies", "title": "Primeros auxilios", "urgency": "high" },
+        { "category": "food", "title": "Alimentos no perecederos" }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "patient-signal:hospital-central:1",
+      "eventId": "venezuela-earthquakes-2026",
+      "source": "mapa-emergencia-rescate",
+      "externalId": "hospital-patient-1",
+      "sourceUrl": "https://terremotovenezuela.app/hospitales/hospital-central#paciente-1",
+      "kind": "patient_signal",
+      "title": "Paciente registrado en Hospital Central",
+      "audienceScope": "in_venezuela",
+      "countryCode": "VE",
+      "admin1": "Lara",
+      "admin2": "Barquisimeto",
+      "status": "hospitalized",
+      "urgency": "high",
+      "categories": ["medical_supplies"],
+      "relationships": [
+        {
+          "type": "patient_at_hospital",
+          "targetId": "entity:hospital-central",
+          "label": "Paciente en Hospital Central"
+        }
+      ]
+    }
+  ],
+  "view": {
+    "sourceLabelById": {
+      "mapa-emergencia-rescate": "Mapa Emergencia VE"
+    },
+    "staleAfterDays": 3
+  }
+}
+```
+
+The response returns a `view` with aggregate stats, `outside_venezuela`,
+`in_venezuela`, `needs`, `health_and_patients`, and `support_channels`
+sections, card badges, warnings, public channels, needs, source labels, source
+URLs, and fuzzed public coordinates. `patient_signal` records are allowed only
+as public-safe signals and include a warning reminding clients not to publish
+contacts, private notes, or sensitive medical details.
+
 ## Batch CSV Deterministic Dedupe
 
 Hosted instances can expose a restricted coordinator or verified-partner endpoint
@@ -437,8 +582,11 @@ humanitarian spreadsheets often have high baseline embedding similarity.
 ## Write Coordination Entity
 
 Entities cover hospitals, shelters, aid centers, organizations, supply hubs,
-official channels, and other public crisis resources. Public coordinates should
-be fuzzed or omitted when exposing exact location would create risk.
+official channels, and other public crisis resources. They may include
+`audienceScope` such as `in_venezuela`, `outside_venezuela`, or `both`, plus
+`countryCode` when a reviewed public projection needs cross-border grouping.
+Public coordinates should be fuzzed or omitted when exposing exact location
+would create risk.
 
 ## Write Restricted Child Protection Case
 

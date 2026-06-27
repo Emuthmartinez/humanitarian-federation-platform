@@ -72,6 +72,16 @@ Key docs for current federation surfaces:
 - Validate external input with strict schemas.
 - Use source-aware and event-aware identifiers; never assume a source-local id
   is globally unique by itself.
+- For public intake, preserve `sourceRecordId`, `contentFingerprint`,
+  `processingHints`, and `canonicalCandidates` in the restricted review record
+  when a caller provides them. These are cleanup/dedupe hints, not public
+  receipts and not canonical writes.
+- For outside-country acopio/donation/resource leads, map public candidates to
+  coordination entities (`donation_center`, `supply_hub`, `organization`, or
+  `official_channel`) with `audienceScope: "outside_venezuela"` in the intake
+  wrapper and ISO-3166 `countryCode` when known. Keep source URLs and country
+  details in restricted review data until the hosted instance has a verified
+  public projection.
 - Build public snapshot outputs from whitelisted redaction helpers. Do not
   serialize raw intake payloads, private record fields, or unrestricted source
   rows into snapshot responses.

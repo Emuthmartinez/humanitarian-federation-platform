@@ -62,7 +62,7 @@ import {
 } from '@humanitarian-federation/core';
 ```
 
-For a no-key public dropbox route, call `handlePublicDataIntakeEndpointRequest`
+For a public intake route, call `handlePublicDataIntakeEndpointRequest`
 from a hosted `POST /api/v1/public-intake` endpoint. It accepts arbitrary JSON,
 CSV text, pasted text, URLs, or small typed file envelopes, stores the raw
 submission for restricted operator review, and returns a redacted receipt
@@ -70,6 +70,16 @@ instead of publishing unverified data. Submitters poll
 `GET /api/v1/public-intake?id=<receipt-id>` for queue status; verified partners
 poll canonical change feeds such as `/api/v1/persons/changes?since=...` and
 `/api/v1/entities/changes?since=...` after operators promote records.
+When callers can provide `sourceRecordId`, `contentFingerprint`,
+`processingHints`, and `canonicalCandidates`, preserve those inside the
+restricted review queue so operators/workers can dedupe and clean records before
+promoting them through canonical person or entity write paths. Do not expose
+those hints in receipts or public snapshots.
+Outside-country acopio, donation, and diaspora resource leads use the same
+entity path: send `audienceScope: "outside_venezuela"`, map physical drop-offs
+to `donation_center` or `supply_hub`, set `countryCode` when the source country
+is known, and preserve source details in the restricted payload until the hosted
+instance promotes a safe public projection.
 
 For provider failover and frontend handoff, publish a redacted normalized
 snapshot with `buildPublicFederationSnapshot` at a stable URL such as

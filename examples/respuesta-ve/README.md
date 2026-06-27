@@ -14,7 +14,7 @@ Respuesta VE is the first public instance proving this platform.
 - Crisis entities: hospitals, shelters, organizations, donation centers, supply
   hubs, and current needs.
 - Verified partner badges.
-- No-key public data intake for volunteer submissions and scrape targets.
+- Public data intake for volunteer submissions and scrape targets.
 - Public normalized snapshot for partner frontends and mirrors.
 
 For a Spanish partner-facing integration note, see
@@ -22,16 +22,35 @@ For a Spanish partner-facing integration note, see
 
 ## Discord Intake Snippet
 
-Tell volunteers they can send any JSON shape to the no-key intake endpoint:
+Tell volunteers they can send any JSON shape to the public intake endpoint:
 
 ```bash
 curl -X POST https://respuestave.org/api/v1/public-intake \
   -H 'content-type: application/json' \
   --data '{
     "source": "discord:respuesta-ve",
+    "sourceRecordId": "discord:respuesta-ve:message-123",
+    "contentFingerprint": "sha256:...",
     "submittedBy": "@your-discord-handle",
     "contact": "where coordinators can reply privately",
     "kind": "mixed",
+    "processingHints": {
+      "dedupeMode": "candidate_review_not_auto_merge",
+      "promotionPath": "/api/v1/persons",
+      "cleanupPipeline": ["extract_rows", "normalize_person", "match_person"]
+    },
+    "canonicalCandidates": [
+      {
+        "kind": "person",
+        "externalId": "discord:respuesta-ve:message-123:row-1",
+        "externalUrl": "https://example.org/source-row",
+        "record": {
+          "displayName": "Ana Araujo",
+          "admin1": "La Guaira",
+          "status": "missing"
+        }
+      }
+    ],
     "note": "Scrape/process this for Respuesta VE",
     "data": {
       "url": "https://example.org/sheet-or-post",
@@ -47,10 +66,13 @@ curl -X POST https://respuestave.org/api/v1/public-intake \
   }'
 ```
 
-The endpoint does not require an API key. It returns a receipt only; the data
-goes into restricted operator review and is not published, merged, or treated as
-verified until it is processed. Poll the receipt until it is promoted, ignored,
-or marked spam:
+Use canonical write-contract field names inside `canonicalCandidates.record`,
+such as `displayName` and `admin1`, even when the source data arrives with
+Spanish labels.
+
+The endpoint returns a receipt only; the data goes into restricted operator
+review and is not published, merged, or treated as verified until it is
+processed. Poll the receipt until it is promoted, ignored, or marked spam:
 
 ```bash
 curl -s "https://respuestave.org/api/v1/public-intake?id=<receipt-id>"
@@ -66,6 +88,73 @@ curl -s "https://respuestave.org/api/v1/persons/changes?since=2026-06-27T00:00:0
 curl -s "https://respuestave.org/api/v1/entities/changes?since=2026-06-27T00:00:00Z" \
   -H "authorization: Bearer <partner-api-key>"
 ```
+
+## Outside-Venezuela Resources
+
+Centros de acopio in the USA, donation links, public WhatsApp lines, and
+diaspora resource posts should be sent as `kind: "entity"` leads with
+`audienceScope: "outside_venezuela"`. Use `donation_center` or `supply_hub` for
+physical drop-off points, `organization` or `official_channel` for resource
+pages, `supply_dropoff` for drop-off instructions, and `donation_url` for money
+links. Keep source URLs on every candidate so operators can verify before
+publishing.
+
+```json
+{
+  "source": "discord:respuesta-ve",
+  "sourceRecordId": "discord:respuesta-ve:usa-acopio-doral",
+  "kind": "entity",
+  "audienceScope": "outside_venezuela",
+  "canonicalCandidates": [
+    {
+      "kind": "entity",
+      "externalId": "discord:respuesta-ve:usa-acopio-doral",
+      "sourceUrl": "https://example.org/source-post",
+      "entity": {
+        "kind": "donation_center",
+        "name": "Centro de acopio Doral",
+        "audienceScope": "outside_venezuela",
+        "countryCode": "US",
+        "admin1": "Estados Unidos",
+        "admin2": "Doral, FL",
+        "channels": [
+          {
+            "type": "supply_dropoff",
+            "displayText": "Recibe insumos medicos, agua, comida e higiene"
+          }
+        ],
+        "needs": [
+          { "category": "medical_supplies", "title": "Primeros auxilios" },
+          { "category": "food", "title": "Alimentos no perecederos" }
+        ]
+      }
+    }
+  ],
+  "data": {
+    "originalPost": "Texto, filas o enlaces originales para revision"
+  }
+}
+```
+
+Use canonical coordination-entity field names inside
+`canonicalCandidates[].entity`, such as `countryCode`, `admin1`, and `admin2`.
+Keep localized source labels like `estado` or `municipio` in the raw restricted
+payload only.
+
+After operators promote reviewed resources, partner frontends can render a
+card-ready public projection with `handleResourceViewEndpointRequest`:
+
+```text
+POST /api/v1/resources/view
+```
+
+Use it for `/apoyo-global`, `/coordinacion`, and failover mirrors that need the
+same public-safe grouping across outside support, in-country hospitals, needs,
+donation links, acopio centers, organizations, and safe hospital-patient
+signals. The view groups resources into `outside_venezuela`, `in_venezuela`,
+`needs`, `health_and_patients`, and `support_channels`, fuzzes coordinates, and
+does not expose private addresses, private contacts, raw notes, photo data, or
+restricted intake fingerprints.
 
 ## Public Snapshot And Mirrors
 

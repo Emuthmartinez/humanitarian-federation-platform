@@ -3,6 +3,7 @@ export * from './matching.js';
 export * from './csv-dedupe.js';
 export * from './api.js';
 export * from './grouped-view.js';
+export * from './resource-view.js';
 export * from './redaction.js';
 export * from './snapshot.js';
 export * from './status.js';

@@ -94,6 +94,8 @@ export const PublicCoordinationEntitySnapshotRecordSchema = z.object({
   kind: str(80),
   name: str(200),
   description: optStr(900),
+  audienceScope: optStr(80),
+  countryCode: z.string().trim().length(2).transform((value) => value.toUpperCase()).nullish(),
   admin1: optStr(120),
   admin2: optStr(160),
   lat: z.number().min(-90).max(90).nullish(),
