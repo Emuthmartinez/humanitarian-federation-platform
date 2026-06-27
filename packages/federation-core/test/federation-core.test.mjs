@@ -830,8 +830,8 @@ t('public federation snapshot normalizes redacted records for mirrors', () => {
   assert.equal(snapshot.recordCounts.tombstones, 1);
   assert.equal(snapshot.contentHash, hashPublicSnapshotContent(snapshot));
   assert.match(snapshot.contentHash, /^sha256:[0-9a-f]{64}$/);
-  assert.equal(snapshot.records.entities[0].audienceScope, 'in_venezuela');
-  assert.equal(snapshot.records.entities[0].countryCode, 'VE');
+  assert.equal('audienceScope' in snapshot.records.entities[0], false);
+  assert.equal('countryCode' in snapshot.records.entities[0], false);
   assert.equal(snapshot.records.entities[0].lat, 10.067);
   assert.equal(snapshot.records.entities[0].lng, -69.347);
   const candidateGroup = snapshot.records.personGroups.find((group) => group.kind === 'candidate_duplicate');

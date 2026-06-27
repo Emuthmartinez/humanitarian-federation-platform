@@ -94,8 +94,6 @@ export const PublicCoordinationEntitySnapshotRecordSchema = z.object({
   kind: str(80),
   name: str(200),
   description: optStr(900),
-  audienceScope: optStr(80),
-  countryCode: z.string().trim().length(2).transform((value) => value.toUpperCase()).nullish(),
   admin1: optStr(120),
   admin2: optStr(160),
   lat: z.number().min(-90).max(90).nullish(),
@@ -284,6 +282,29 @@ function sourceRefFromPerson(record: PublicPersonSnapshotRecord): z.infer<typeof
   };
 }
 
+function publicEntitySnapshotRecordFromEntity(entity: CoordinationEntity): PublicCoordinationEntitySnapshotRecord {
+  const redacted = redactCoordinationEntity(CoordinationEntitySchema.parse(entity));
+  return PublicCoordinationEntitySnapshotRecordSchema.parse({
+    id: redacted.id,
+    eventId: redacted.eventId,
+    source: redacted.source,
+    externalId: redacted.externalId,
+    sourceUrl: redacted.sourceUrl,
+    kind: redacted.kind,
+    name: redacted.name,
+    description: redacted.description,
+    admin1: redacted.admin1,
+    admin2: redacted.admin2,
+    lat: redacted.lat,
+    lng: redacted.lng,
+    channels: redacted.channels,
+    needs: redacted.needs,
+    sourceUpdatedAt: redacted.sourceUpdatedAt,
+    lastVerifiedAt: redacted.lastVerifiedAt,
+    updatedAt: redacted.updatedAt,
+  });
+}
+
 function singletonGroupFromPerson(record: PublicPersonSnapshotRecord): PublicPersonGroup {
   return PublicPersonGroupSchema.parse({
     id: `person-group:${record.id}`,
@@ -420,8 +441,7 @@ export function buildPublicFederationSnapshot(
     .map((record) => PublicPersonSnapshotRecordSchema.parse(record))
     .sort(compareById);
   const entities = (options.entities ?? [])
-    .map((entity) => redactCoordinationEntity(CoordinationEntitySchema.parse(entity)))
-    .map((entity) => PublicCoordinationEntitySnapshotRecordSchema.parse(entity))
+    .map((entity) => publicEntitySnapshotRecordFromEntity(entity))
     .sort(compareById);
   const csvGroups = (options.csvCandidatePersonGroups ?? [])
     .map((group) => publicPersonGroupFromCsvCandidateGroup(event.id, group, defaultLocale));
