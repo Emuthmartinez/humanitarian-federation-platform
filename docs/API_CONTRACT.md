@@ -4,6 +4,91 @@ The package defines contracts that a hosted instance can expose over HTTP. The
 current public proof is Respuesta VE's `/api/v1/*` routes; this document names
 the generic shape.
 
+## Public No-Key Data Intake
+
+Hosted instances can expose a no-API-key dropbox for volunteers, Discord users,
+partner forwards, and quick scrape targets:
+
+```text
+POST /api/v1/public-intake
+Content-Type: application/json
+Authorization: not required
+```
+
+This endpoint accepts any JSON body, including arrays, arbitrary objects,
+wrapped submissions, pasted text, CSV text, or URL lists. Implementations can
+use `handlePublicDataIntakeEndpointRequest` from
+`@humanitarian-federation/core` to normalize the body into a restricted review
+record and a safe receipt. The helper does not fetch or scrape URLs
+synchronously; it records http(s) links as `urlsToReview` so operators or a
+separate worker can process them with SSRF protections.
+
+Recommended wrapped shape:
+
+```json
+{
+  "source": "discord:respuesta-ve",
+  "submittedBy": "@discord-user",
+  "contact": "private reply contact if needed",
+  "kind": "mixed",
+  "note": "Please scrape this sheet and process the rows.",
+  "data": {
+    "sheet": "https://example.org/public-hospital-sheet",
+    "anything": "Any shape is accepted here"
+  }
+}
+```
+
+Raw JSON is also valid:
+
+```json
+[
+  {
+    "name": "Ana Araujo",
+    "hospital": "Hospital Central",
+    "source": "volunteer spreadsheet"
+  }
+]
+```
+
+CSV or pasted text can be wrapped when a client cannot send raw text:
+
+```json
+{
+  "source": "discord:respuesta-ve",
+  "csvText": "Nombre,Hospital\nAna Araujo,Hospital Central"
+}
+```
+
+Safe receipt:
+
+```json
+{
+  "id": "public-intake:00abc123",
+  "eventId": "venezuela-earthquakes-2026",
+  "source": "discord:respuesta-ve",
+  "status": "received_for_review",
+  "authentication": "none_required",
+  "submittedAt": "2026-06-26T15:00:00.000Z",
+  "payloadFormat": "json",
+  "submissionKind": "mixed",
+  "payloadSizeChars": 220,
+  "urlCount": 1,
+  "warnings": [],
+  "recommendedAction": "operator_triage",
+  "message": "Submission received for restricted operator review; it will not be published or merged automatically.",
+  "disclosure": "restricted_unverified_public_submission"
+}
+```
+
+The stored submission is restricted operator data. It may contain private
+contacts or raw fields supplied by the sender, but the receipt must not echo
+names, contacts, notes, document identifiers, exact coordinates, raw payload
+rows, or child protection details. No-key intake must still use rate limits,
+size limits, logging, abuse review, and a non-public queue. Intake data is not a
+federated record until an operator validates, maps, redacts, deduplicates, and
+publishes it through the normal write paths.
+
 ## Write Person Record
 
 ```json
@@ -45,6 +130,50 @@ candidate duplicates, not automatic merges.
   ]
 }
 ```
+
+## Batch CSV Dedupe Endpoint
+
+Hosted instances can expose a restricted coordinator or verified-partner
+endpoint for CSV review:
+
+```text
+POST /api/v1/dedupe/csv
+Content-Type: application/json
+Authorization: required
+```
+
+Implementations can use `handleCsvDedupeEndpointRequest` from
+`@humanitarian-federation/core`. The request includes CSV text, event/source
+metadata, optional column mappings, deterministic dedupe options, and optional
+embedding options. The response returns rejected rows, deterministic review
+candidates, and embedding-assisted review candidates when a server-side
+`EmbeddingProvider` is supplied.
+
+Example request for a Spanish hospital-style sheet:
+
+```json
+{
+  "csvText": "Nombre,Apellido,CI,Edad,Hospital,Status\nAna,Araujo,V-12.345.678,31,Hospital Central,Confirmado",
+  "eventId": "venezuela-hospitalized-review",
+  "source": "personas-hospitalizadas-csv",
+  "identifierCountryCode": "VE",
+  "ignoreStatus": true,
+  "columns": {
+    "admin2": "Hospital"
+  },
+  "embedding": {
+    "enabled": true,
+    "includeColumns": ["Nombre", "Apellido", "Edad", "Sexo", "Hospital"]
+  }
+}
+```
+
+The endpoint is restricted review infrastructure. It may include public-safe
+names and source row numbers for coordinators, but it must not echo raw national
+IDs, passport numbers, contacts, private notes, raw photo hashes, precise
+coordinates, child protection details, provider tokens, or raw source payloads.
+Every output row remains advisory and must lead to `coordinator_review`, not an
+automatic merge.
 
 ## Batch CSV Deterministic Dedupe
 
@@ -179,7 +308,10 @@ merge identities on their own.
 For GCP-backed embedding, call `createVertexMultimodalEmbeddingProvider` on the
 server with a short-lived access token or token callback. The core helper uses
 Vertex AI `multimodalembedding@001` through the `:predict` endpoint and sends
-only the filtered row text.
+only the filtered row text. The multimodal endpoint is called one instance at a
+time by default, and candidate thresholds default to a strict review band
+(`review >= 0.975`, `possible >= 0.985`, `likely >= 0.99`) because uniform
+humanitarian spreadsheets often have high baseline embedding similarity.
 
 ## Write Coordination Entity
 

@@ -15,10 +15,12 @@ import {
   findCsvPersonDuplicateCandidates,
   findEmbeddingDuplicateCandidates,
   handleCsvDedupeEndpointRequest,
+  handlePublicDataIntakeEndpointRequest,
   isSensitiveEmbeddingColumn,
   normalizeDomain,
   rankPersonCandidates,
   redactChildProtectionCase,
+  redactPublicDataIntakeSubmissionReceipt,
   redactChildRelationshipClaimReceipt,
   redactCoordinationEntity,
   redactPersonRecord,
@@ -410,6 +412,61 @@ t('csv dedupe endpoint returns embedding candidates through injected provider', 
   assert.equal(response.embedding.candidates[0].left.displayName, 'Ana Araujo');
   assert.equal(JSON.stringify(response).includes('private note'), false);
   assert.equal(JSON.stringify(response).includes('V-12.345.678'), false);
+});
+
+t('public intake accepts arbitrary unauthenticated JSON and returns a safe receipt', () => {
+  const response = handlePublicDataIntakeEndpointRequest({
+    source: 'discord:respuesta-ve',
+    submittedBy: '@volunteer',
+    contact: '+58 private phone',
+    note: 'Please scrape the linked sheet and process these rows.',
+    kind: 'mixed',
+    data: {
+      sheet: 'https://example.org/public-hospital-sheet',
+      rows: [
+        {
+          name: 'Ana Julia Araujo',
+          hospital: 'Hospital Central',
+          phone: '+58 private phone',
+        },
+      ],
+    },
+  }, {
+    defaultEventId: 'venezuela-earthquakes-2026',
+    now: '2026-06-26T15:00:00Z',
+  });
+
+  assert.equal(response.submission.eventId, 'venezuela-earthquakes-2026');
+  assert.equal(response.submission.source, 'discord:respuesta-ve');
+  assert.equal(response.submission.reviewStatus, 'received_for_review');
+  assert.equal(response.submission.submissionKind, 'mixed');
+  assert.equal(response.submission.payloadFormat, 'json');
+  assert.deepEqual(response.submission.urlsToReview, ['https://example.org/public-hospital-sheet']);
+  assert.equal(response.receipt.authentication, 'none_required');
+  assert.equal(response.receipt.urlCount, 1);
+  assert.equal(response.receipt.message.includes('will not be published or merged automatically'), true);
+  assert.equal(JSON.stringify(response.receipt).includes('+58 private phone'), false);
+  assert.equal(JSON.stringify(response.receipt).includes('Ana Julia Araujo'), false);
+  assert.equal(JSON.stringify(response.submission).includes('+58 private phone'), true);
+});
+
+t('public intake accepts raw text and keeps receipts redacted', () => {
+  const response = handlePublicDataIntakeEndpointRequest(
+    'Nombre,Hospital\nAna Araujo,Hospital Central\nhttps://example.org/source',
+    {
+      defaultEventId: 'venezuela-earthquakes-2026',
+      defaultSource: 'discord-dropbox',
+      receivedVia: 'discord',
+      now: new Date('2026-06-26T16:00:00Z'),
+    },
+  );
+
+  assert.equal(response.submission.source, 'discord-dropbox');
+  assert.equal(response.submission.receivedVia, 'discord');
+  assert.equal(response.submission.payloadFormat, 'csv');
+  assert.deepEqual(response.submission.urlsToReview, ['https://example.org/source']);
+  assert.deepEqual(redactPublicDataIntakeSubmissionReceipt(response.submission), response.receipt);
+  assert.equal(JSON.stringify(response.receipt).includes('Ana Araujo'), false);
 });
 
 t('status summary tells an open local site to review another source resolution', () => {

@@ -14,6 +14,31 @@ Respuesta VE is the first public instance proving this platform.
 - Crisis entities: hospitals, shelters, organizations, donation centers, supply
   hubs, and current needs.
 - Verified partner badges.
+- No-key public data intake for volunteer submissions and scrape targets.
+
+## Discord Intake Snippet
+
+Tell volunteers they can send any JSON shape to the no-key intake endpoint:
+
+```bash
+curl -X POST https://respuestave.org/api/v1/public-intake \
+  -H 'content-type: application/json' \
+  --data '{
+    "source": "discord:respuesta-ve",
+    "submittedBy": "@your-discord-handle",
+    "contact": "where coordinators can reply privately",
+    "kind": "mixed",
+    "note": "Scrape/process this for Respuesta VE",
+    "data": {
+      "url": "https://example.org/sheet-or-post",
+      "anything": "paste rows, lists, screenshots links, hospital needs, people, shelters, etc."
+    }
+  }'
+```
+
+The endpoint does not require an API key. It returns a receipt only; the data
+goes into restricted operator review and is not published, merged, or treated as
+verified until it is processed.
 
 ## Boundary
 
