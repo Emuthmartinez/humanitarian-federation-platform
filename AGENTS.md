@@ -8,7 +8,7 @@ Humanitarian Federation Platform is a public, reusable foundation for crisis
 data federation. It provides contracts and deterministic helpers that let
 independent public surfaces read/write humanitarian records while preserving
 source provenance, privacy boundaries, duplicate-review workflows, freshness
-signals, and verified partner badges.
+signals, verified partner badges, and public snapshot failover.
 
 The first instance is Respuesta VE for the June 2026 Venezuela earthquakes, but
 this repo must stay disaster-agnostic.
@@ -20,6 +20,12 @@ this repo must stay disaster-agnostic.
 - Duplicate matching is advisory. Do not add code or docs that imply automatic
   identity merge, automatic resolution, or irreversible deletion.
 - Keep source provenance on every federated record.
+- Public snapshots are availability artifacts, not global truth ledgers. Clients
+  and mirrors must verify `contentHash`, prefer newer trusted `sequence`
+  values, and apply tombstones from the newest trusted snapshot.
+- Keep machine fields stable across locales. Localize human-facing labels,
+  warning messages, source names, badge labels, and public notes through
+  snapshot `defaultLocale`/`locales` instead of changing enum values.
 - Badges mean verified federation participation and scopes, not government or
   structural-safety endorsement.
 - Prefer deterministic logic for write paths. LLMs may annotate or triage, but
@@ -49,6 +55,14 @@ docs/                      Architecture and operator guidance
 examples/                  Instance integration notes
 ```
 
+Key docs for current federation surfaces:
+
+- `docs/API_CONTRACT.md` for hosted API shapes.
+- `docs/PUBLIC_SNAPSHOT.md` for normalized public datasets, mirrors,
+  tombstones, hashes, and localized public copy.
+- `examples/respuesta-ve/TERREMOTO_VENEZUELA_HANDOFF.md` for the Spanish
+  Terremoto Venezuela partner handoff.
+
 ## Coding Conventions
 
 - Keep helpers pure and deterministic unless a file explicitly documents an
@@ -58,8 +72,14 @@ examples/                  Instance integration notes
 - Validate external input with strict schemas.
 - Use source-aware and event-aware identifiers; never assume a source-local id
   is globally unique by itself.
+- Build public snapshot outputs from whitelisted redaction helpers. Do not
+  serialize raw intake payloads, private record fields, or unrestricted source
+  rows into snapshot responses.
+- Keep `candidate_duplicate` and other review groups tied to coordinator review
+  unless a coordinator-confirmed merge is explicitly modeled.
 - Tests should cover privacy redaction, stale/conflict status handling,
-  duplicate false positives, and badge trust decisions.
+  duplicate false positives, badge trust decisions, public snapshot hashing,
+  tombstones, mirror metadata, and locale behavior.
 
 ## Documentation Conventions
 
@@ -69,6 +89,9 @@ examples/                  Instance integration notes
   "official", "certified safe", or "government approved".
 - Treat HXL as a legacy adapter/export concern, not the core platform schema.
 - Keep Respuesta VE references inside examples or first-instance context.
+- For Spanish-facing first-instance docs, preserve Spanish public copy. Use
+  stable English machine enums in examples only where they are part of the API
+  contract.
 
 ## Security
 
