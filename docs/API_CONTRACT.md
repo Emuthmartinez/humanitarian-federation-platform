@@ -13,11 +13,15 @@ partner forwards, and quick scrape targets:
 POST /api/v1/public-intake
 Content-Type: application/json
 Authorization: not required
+
+GET /api/v1/public-intake?id=<receipt-id>
+Authorization: not required
 ```
 
 This endpoint accepts any JSON body, including arrays, arbitrary objects,
-wrapped submissions, pasted text, CSV text, or URL lists. Implementations can
-use `handlePublicDataIntakeEndpointRequest` from
+wrapped submissions, pasted text, CSV text, URL lists, or small typed file
+envelopes containing text extracts or image data URLs. Implementations can use
+`handlePublicDataIntakeEndpointRequest` from
 `@humanitarian-federation/core` to normalize the body into a restricted review
 record and a safe receipt. The helper does not fetch or scrape URLs
 synchronously; it records http(s) links as `urlsToReview` so operators or a
@@ -35,6 +39,21 @@ Recommended wrapped shape:
   "data": {
     "sheet": "https://example.org/public-hospital-sheet",
     "anything": "Any shape is accepted here"
+  },
+  "files": {
+    "declaredPurpose": "entity",
+    "items": [
+      {
+        "name": "hospitales.csv",
+        "type": "text/csv",
+        "text": "name,state\nHospital Central,Lara"
+      },
+      {
+        "name": "persona.jpg",
+        "type": "image/jpeg",
+        "dataUrl": "data:image/jpeg;base64,..."
+      }
+    ]
   }
 }
 ```
@@ -76,8 +95,33 @@ Safe receipt:
   "urlCount": 1,
   "warnings": [],
   "recommendedAction": "operator_triage",
-  "message": "Submission received for restricted operator review; it will not be published or merged automatically.",
+  "processedAt": null,
+  "processedRecord": null,
+  "publicReviewNote": null,
+  "pollAfterSeconds": 30,
+  "statusUrl": "https://respuestave.org/api/v1/public-intake?id=public-intake:00abc123",
+  "message": "Submission received for restricted operator review. Poll the receipt status until processing is complete; it will not be published or merged automatically.",
   "disclosure": "restricted_unverified_public_submission"
+}
+```
+
+Receipt polling is for submitters and public forwarding sites. It answers the
+question "what happened to my upload?" without returning raw submitted rows,
+private contacts, names, notes, exact coordinates, photo hashes, or document
+identifiers. Valid receipt lifecycle values are `received_for_review`,
+`triaged`, `promoted`, `ignored`, and `spam`. When a reviewed submission becomes
+a canonical public record, the receipt can expose only a safe pointer:
+
+```json
+{
+  "status": "promoted",
+  "processedAt": "2026-06-26T15:05:00.000Z",
+  "processedRecord": {
+    "kind": "entity",
+    "id": "entity:hospital-central",
+    "url": "https://respuestave.org/api/v1/entities/entity:hospital-central"
+  },
+  "pollAfterSeconds": null
 }
 ```
 
@@ -88,6 +132,12 @@ rows, or child protection details. No-key intake must still use rate limits,
 size limits, logging, abuse review, and a non-public queue. Intake data is not a
 federated record until an operator validates, maps, redacts, deduplicates, and
 publishes it through the normal write paths.
+
+Processed canonical data is fetched separately. Partners with read scopes should
+poll the normal change feeds with a durable `since` cursor, for example
+`GET /api/v1/persons/changes?since=<last-seen-updatedAt>` and
+`GET /api/v1/entities/changes?since=<last-seen-updatedAt>`. Public intake
+receipts are not the canonical feed; they are a sender-facing queue status.
 
 ## Write Person Record
 

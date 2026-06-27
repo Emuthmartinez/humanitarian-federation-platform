@@ -41,6 +41,24 @@ export const PublicIntakeSubmissionKinds = [
   'unknown',
 ] as const;
 export const PublicIntakeReceivedVia = ['public_api', 'discord', 'web_form', 'partner_forward', 'unknown'] as const;
+export const PublicIntakeReviewStatuses = ['received_for_review', 'triaged', 'promoted', 'ignored', 'spam'] as const;
+export const PublicIntakeRecommendedActions = [
+  'operator_triage',
+  'scrape_source',
+  'dedupe_review',
+  'canonical_record_created',
+  'ignored_no_action',
+  'spam_or_abuse',
+] as const;
+export const PublicIntakeProcessedRecordKinds = [
+  'person',
+  'entity',
+  'need',
+  'status',
+  'media',
+  'map_report',
+  'other',
+] as const;
 
 const PublicHttpUrlSchema = z.string().trim().url().max(1_000).refine((value) => /^https?:\/\//i.test(value), {
   message: 'must use http or https',
@@ -56,6 +74,7 @@ export const PublicDataIntakeSubmissionRecordSchema = z.object({
   source: z.string().trim().min(1).max(160),
   sourceUrl: PublicHttpUrlSchema.nullish(),
   submittedAt: IntakeTimestampSchema,
+  updatedAt: IntakeTimestampSchema.optional(),
   receivedVia: z.enum(PublicIntakeReceivedVia).default('public_api'),
   payloadFormat: z.enum(PublicIntakePayloadFormats),
   submissionKind: z.enum(PublicIntakeSubmissionKinds).default('unknown'),
@@ -67,8 +86,13 @@ export const PublicDataIntakeSubmissionRecordSchema = z.object({
   contactPrivate: z.string().trim().min(1).max(500).nullish(),
   notePrivate: z.string().trim().min(1).max(2_000).nullish(),
   warnings: z.array(z.string().trim().min(1).max(300)).max(50).default([]),
-  reviewStatus: z.literal('received_for_review').default('received_for_review'),
-  recommendedAction: z.literal('operator_triage').default('operator_triage'),
+  reviewStatus: z.enum(PublicIntakeReviewStatuses).default('received_for_review'),
+  recommendedAction: z.enum(PublicIntakeRecommendedActions).default('operator_triage'),
+  processedRecordKind: z.enum(PublicIntakeProcessedRecordKinds).nullish(),
+  processedRecordId: z.string().trim().min(1).max(160).nullish(),
+  processedRecordUrl: PublicHttpUrlSchema.nullish(),
+  processedAt: IntakeTimestampSchema.nullish(),
+  publicReviewNote: z.string().trim().min(1).max(500).nullish(),
   disclosure: z.literal('restricted_unverified_public_submission')
     .default('restricted_unverified_public_submission'),
 }).strict();
@@ -76,6 +100,9 @@ export const PublicDataIntakeSubmissionRecordSchema = z.object({
 export type PublicIntakePayloadFormat = (typeof PublicIntakePayloadFormats)[number];
 export type PublicIntakeSubmissionKind = (typeof PublicIntakeSubmissionKinds)[number];
 export type PublicIntakeReceivedViaType = (typeof PublicIntakeReceivedVia)[number];
+export type PublicIntakeReviewStatus = (typeof PublicIntakeReviewStatuses)[number];
+export type PublicIntakeRecommendedAction = (typeof PublicIntakeRecommendedActions)[number];
+export type PublicIntakeProcessedRecordKind = (typeof PublicIntakeProcessedRecordKinds)[number];
 export type PublicDataIntakeSubmissionRecord = z.infer<typeof PublicDataIntakeSubmissionRecordSchema>;
 
 export interface PublicDataIntakeEndpointOptions {
@@ -90,15 +117,25 @@ export interface PublicDataIntakeReceipt {
   id: string;
   eventId: string;
   source: string;
-  status: 'received_for_review';
+  status: PublicIntakeReviewStatus;
   authentication: 'none_required';
   submittedAt: string;
+  updatedAt?: string;
   payloadFormat: PublicIntakePayloadFormat;
   submissionKind: PublicIntakeSubmissionKind;
   payloadSizeChars: number;
   urlCount: number;
   warnings: string[];
-  recommendedAction: 'operator_triage';
+  recommendedAction: PublicIntakeRecommendedAction;
+  processedAt?: string | null;
+  processedRecord?: {
+    kind?: PublicIntakeProcessedRecordKind;
+    id?: string;
+    url?: string;
+  } | null;
+  publicReviewNote?: string | null;
+  pollAfterSeconds?: number | null;
+  statusUrl?: string;
   message: string;
   disclosure: 'restricted_unverified_public_submission';
 }
@@ -281,6 +318,14 @@ function inferPayloadFormat(input: unknown, urlsToReview: string[], warnings: st
 export function redactPublicDataIntakeSubmissionReceipt(
   submission: PublicDataIntakeSubmissionRecord,
 ): PublicDataIntakeReceipt {
+  const processedRecord = submission.processedRecordKind || submission.processedRecordId || submission.processedRecordUrl
+    ? {
+        ...(submission.processedRecordKind ? { kind: submission.processedRecordKind } : {}),
+        ...(submission.processedRecordId ? { id: submission.processedRecordId } : {}),
+        ...(submission.processedRecordUrl ? { url: submission.processedRecordUrl } : {}),
+      }
+    : null;
+
   return {
     id: submission.id,
     eventId: submission.eventId,
@@ -288,13 +333,20 @@ export function redactPublicDataIntakeSubmissionReceipt(
     status: submission.reviewStatus,
     authentication: 'none_required',
     submittedAt: submission.submittedAt,
+    updatedAt: submission.updatedAt ?? submission.submittedAt,
     payloadFormat: submission.payloadFormat,
     submissionKind: submission.submissionKind,
     payloadSizeChars: submission.payloadSizeChars,
     urlCount: submission.urlsToReview.length,
     warnings: submission.warnings,
     recommendedAction: submission.recommendedAction,
-    message: 'Submission received for restricted operator review; it will not be published or merged automatically.',
+    processedAt: submission.processedAt ?? null,
+    processedRecord,
+    publicReviewNote: submission.publicReviewNote ?? null,
+    pollAfterSeconds: submission.reviewStatus === 'received_for_review' || submission.reviewStatus === 'triaged'
+      ? 30
+      : null,
+    message: 'Submission received for restricted operator review. Poll the receipt status until processing is complete; it will not be published or merged automatically.',
     disclosure: submission.disclosure,
   };
 }
@@ -333,6 +385,7 @@ export function handlePublicDataIntakeEndpointRequest(
     source,
     sourceUrl,
     submittedAt,
+    updatedAt: submittedAt,
     receivedVia,
     payloadFormat: inferPayloadFormat(requestBody, urlsToReview, warnings),
     submissionKind,
