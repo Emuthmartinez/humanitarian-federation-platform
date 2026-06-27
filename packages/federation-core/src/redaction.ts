@@ -37,6 +37,8 @@ export interface PublicCoordinationEntity {
   kind: string;
   name: string;
   description: string | null | undefined;
+  audienceScope: string | null | undefined;
+  countryCode: string | null | undefined;
   admin1: string | null | undefined;
   admin2: string | null | undefined;
   lat: number | null | undefined;
@@ -134,6 +136,8 @@ export function redactCoordinationEntity(entity: CoordinationEntity): PublicCoor
     kind: entity.kind,
     name: entity.name,
     description: entity.description,
+    audienceScope: entity.audienceScope,
+    countryCode: entity.countryCode,
     admin1: entity.admin1,
     admin2: entity.admin2,
     lat: fuzzCoordinate(entity.lat),

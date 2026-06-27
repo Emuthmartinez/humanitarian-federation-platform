@@ -176,11 +176,13 @@ candidates. Map diaspora collection centers as `kind: "donation_center"` or
 drop-off instructions as `channels.type: "supply_dropoff"`, and needed items
 as `needs` with categories such as `medical_supplies`, `food`, `water`,
 `shelter`, or `funds`. Include `audienceScope: "outside_venezuela"` in the
-restricted intake wrapper. If the hosted instance has a dedicated `countryCode`
-field or donation-center table, preserve the country there; otherwise use the
-public entity geography fields for country/region (`admin1` or the
-instance-local `estado`) and city/state (`admin2` or `municipio`) until the
-instance adds first-class country fields to canonical entities.
+restricted intake wrapper. Canonical coordination entities in the reusable
+platform schema also support `audienceScope` and ISO-3166 alpha-2 `countryCode`.
+If a hosted instance has not wired those fields through its local API/database
+yet, preserve the country in the restricted payload or native donation-center
+table and use the public entity geography fields for country/region (`admin1`
+or the instance-local `estado`) and city/state (`admin2` or `municipio`) during
+review.
 
 These fields help operators and workers choose deterministic cleanup steps, but
 they remain advisory. Promote people through the authenticated person write path,

@@ -77,8 +77,9 @@ promoting them through canonical person or entity write paths. Do not expose
 those hints in receipts or public snapshots.
 Outside-country acopio, donation, and diaspora resource leads use the same
 entity path: send `audienceScope: "outside_venezuela"`, map physical drop-offs
-to `donation_center` or `supply_hub`, and preserve country/source details in the
-restricted payload until the hosted instance promotes a safe public projection.
+to `donation_center` or `supply_hub`, set `countryCode` when the source country
+is known, and preserve source details in the restricted payload until the hosted
+instance promotes a safe public projection.
 
 For provider failover and frontend handoff, publish a redacted normalized
 snapshot with `buildPublicFederationSnapshot` at a stable URL such as

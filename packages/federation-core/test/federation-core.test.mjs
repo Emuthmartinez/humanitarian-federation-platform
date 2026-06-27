@@ -601,6 +601,8 @@ t('coordination entity schema validates public channels and private address', ()
     sourceUrl: 'https://site-a.example/hospitals/1',
     kind: 'hospital',
     name: 'Hospital Central',
+    audienceScope: 'in_venezuela',
+    countryCode: 've',
     lat: 10.06741,
     lng: -69.34742,
     addressPrivate: 'private street address',
@@ -609,6 +611,8 @@ t('coordination entity schema validates public channels and private address', ()
   });
   const redacted = redactCoordinationEntity(entity);
   assert.equal(JSON.stringify(redacted).includes('private street address'), false);
+  assert.equal(redacted.audienceScope, 'in_venezuela');
+  assert.equal(redacted.countryCode, 'VE');
   assert.equal(redacted.lat, 10.067);
   assert.equal(redacted.lng, -69.347);
 });
@@ -640,6 +644,8 @@ t('public federation snapshot normalizes redacted records for mirrors', () => {
     sourceUrl: 'https://terremotovenezuela.app/resources/hospital-central',
     kind: 'hospital',
     name: 'Hospital Central',
+    audienceScope: 'in_venezuela',
+    countryCode: 'VE',
     lat: 10.06741,
     lng: -69.34742,
     addressPrivate: 'private street address',
@@ -691,6 +697,8 @@ t('public federation snapshot normalizes redacted records for mirrors', () => {
   assert.equal(snapshot.recordCounts.tombstones, 1);
   assert.equal(snapshot.contentHash, hashPublicSnapshotContent(snapshot));
   assert.match(snapshot.contentHash, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(snapshot.records.entities[0].audienceScope, 'in_venezuela');
+  assert.equal(snapshot.records.entities[0].countryCode, 'VE');
   assert.equal(snapshot.records.entities[0].lat, 10.067);
   assert.equal(snapshot.records.entities[0].lng, -69.347);
   const candidateGroup = snapshot.records.personGroups.find((group) => group.kind === 'candidate_duplicate');

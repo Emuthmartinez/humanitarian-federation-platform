@@ -79,8 +79,9 @@ Key docs for current federation surfaces:
 - For outside-country acopio/donation/resource leads, map public candidates to
   coordination entities (`donation_center`, `supply_hub`, `organization`, or
   `official_channel`) with `audienceScope: "outside_venezuela"` in the intake
-  wrapper. Keep source URLs and country details in restricted review data until
-  the hosted instance has a verified public projection.
+  wrapper and ISO-3166 `countryCode` when known. Keep source URLs and country
+  details in restricted review data until the hosted instance has a verified
+  public projection.
 - Build public snapshot outputs from whitelisted redaction helpers. Do not
   serialize raw intake payloads, private record fields, or unrestricted source
   rows into snapshot responses.
