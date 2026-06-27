@@ -6,3 +6,7 @@ dist/
 !.env.example
 .turbo/
 .context/
+
+# Local working artifacts (generated outputs, screenshots) — keep out of the repo
+outputs/
+mapa-home-desktop.png
