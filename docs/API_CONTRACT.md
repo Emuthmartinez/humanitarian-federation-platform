@@ -352,6 +352,94 @@ columns, normalized ID columns, private notes, raw source text, and moderation
 notes. Conflict warnings remain advisory; clients must not present grouped rows
 as confirmed merges unless a coordinator has reviewed them.
 
+## Resource View Endpoint
+
+Hosted instances can expose a public-safe resource projection for hospitals,
+needs, shelters, acopio centers, donation links, organizations, public support
+channels, map-report need clusters, and safe hospital-patient signals:
+
+```text
+POST /api/v1/resources/view
+Content-Type: application/json
+Authorization: deployment-specific
+```
+
+Implementations can use `handleResourceViewEndpointRequest` from
+`@humanitarian-federation/core`. The endpoint accepts reviewed
+`CoordinationEntity` records plus already-public-safe resource records. It is
+not a raw-intake publisher; private contacts, private addresses, raw notes,
+content fingerprints, photo data, exact medical details, and raw payload rows
+must stay in the restricted review queue.
+
+```json
+{
+  "entities": [
+    {
+      "id": "entity:usa-doral-acopio",
+      "eventId": "venezuela-earthquakes-2026",
+      "source": "mapa-emergencia-rescate",
+      "externalId": "usa-doral-acopio",
+      "sourceUrl": "https://terremotovenezuela.app/apoyo-global",
+      "kind": "donation_center",
+      "name": "Centro de acopio Doral",
+      "audienceScope": "outside_venezuela",
+      "countryCode": "US",
+      "admin1": "Estados Unidos",
+      "admin2": "Doral, FL",
+      "channels": [
+        {
+          "type": "supply_dropoff",
+          "displayText": "Recibe insumos medicos, agua y comida",
+          "isPrimary": true
+        }
+      ],
+      "needs": [
+        { "category": "medical_supplies", "title": "Primeros auxilios", "urgency": "high" },
+        { "category": "food", "title": "Alimentos no perecederos" }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "patient-signal:hospital-central:1",
+      "eventId": "venezuela-earthquakes-2026",
+      "source": "mapa-emergencia-rescate",
+      "externalId": "hospital-patient-1",
+      "sourceUrl": "https://terremotovenezuela.app/hospitales/hospital-central#paciente-1",
+      "kind": "patient_signal",
+      "title": "Paciente registrado en Hospital Central",
+      "audienceScope": "in_venezuela",
+      "countryCode": "VE",
+      "admin1": "Lara",
+      "admin2": "Barquisimeto",
+      "status": "hospitalized",
+      "urgency": "high",
+      "categories": ["medical_supplies"],
+      "relationships": [
+        {
+          "type": "patient_at_hospital",
+          "targetId": "entity:hospital-central",
+          "label": "Paciente en Hospital Central"
+        }
+      ]
+    }
+  ],
+  "view": {
+    "sourceLabelById": {
+      "mapa-emergencia-rescate": "Mapa Emergencia VE"
+    },
+    "staleAfterDays": 3
+  }
+}
+```
+
+The response returns a `view` with aggregate stats, `outside_venezuela`,
+`in_venezuela`, `needs`, `health_and_patients`, and `support_channels`
+sections, card badges, warnings, public channels, needs, source labels, source
+URLs, and fuzzed public coordinates. `patient_signal` records are allowed only
+as public-safe signals and include a warning reminding clients not to publish
+contacts, private notes, or sensitive medical details.
+
 ## Batch CSV Deterministic Dedupe
 
 Hosted instances can expose a restricted coordinator or verified-partner endpoint
@@ -493,8 +581,11 @@ humanitarian spreadsheets often have high baseline embedding similarity.
 ## Write Coordination Entity
 
 Entities cover hospitals, shelters, aid centers, organizations, supply hubs,
-official channels, and other public crisis resources. Public coordinates should
-be fuzzed or omitted when exposing exact location would create risk.
+official channels, and other public crisis resources. They may include
+`audienceScope` such as `in_venezuela`, `outside_venezuela`, or `both`, plus
+`countryCode` when a reviewed public projection needs cross-border grouping.
+Public coordinates should be fuzzed or omitted when exposing exact location
+would create risk.
 
 ## Write Restricted Child Protection Case
 

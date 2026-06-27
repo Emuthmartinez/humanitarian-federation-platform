@@ -135,6 +135,21 @@ publishing.
 }
 ```
 
+After operators promote reviewed resources, partner frontends can render a
+card-ready public projection with `handleResourceViewEndpointRequest`:
+
+```text
+POST /api/v1/resources/view
+```
+
+Use it for `/apoyo-global`, `/coordinacion`, and failover mirrors that need the
+same public-safe grouping across outside support, in-country hospitals, needs,
+donation links, acopio centers, organizations, and safe hospital-patient
+signals. The view groups resources into `outside_venezuela`, `in_venezuela`,
+`needs`, `health_and_patients`, and `support_channels`, fuzzes coordinates, and
+does not expose private addresses, private contacts, raw notes, photo data, or
+restricted intake fingerprints.
+
 ## Public Snapshot And Mirrors
 
 For public frontend handoff and provider failover, publish the redacted

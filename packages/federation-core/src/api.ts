@@ -10,7 +10,7 @@ import {
   type CsvPersonParseFailure,
   type CsvPersonRecordRef,
 } from './csv-dedupe.js';
-import { PersonStatuses, type FederatedPersonRecord, type PersonStatus } from './schemas.js';
+import { CoordinationEntitySchema, PersonStatuses, type FederatedPersonRecord, type PersonStatus } from './schemas.js';
 import {
   buildCsvEmbeddingInputs,
   embedCsvRecords,
@@ -24,6 +24,11 @@ import {
   buildGroupedPersonViewModel,
   type GroupedPersonViewModel,
 } from './grouped-view.js';
+import {
+  buildResourceViewModel,
+  PublicResourceViewInputSchema,
+  type ResourceViewModel,
+} from './resource-view.js';
 
 const MAX_CSV_UPLOAD_BYTES = 20_000_000;
 const MAX_PUBLIC_INTAKE_PAYLOAD_CHARS = 5_000_000;
@@ -441,6 +446,40 @@ export function handleGroupedPersonViewEndpointRequest(
       parsed.groupedReportsCsvText,
       parsed.view,
     ),
+  };
+}
+
+const ResourceViewOptionsSchema = z.object({
+  sourceLabelById: z.record(
+    z.string().trim().min(1).max(160),
+    z.string().trim().min(1).max(240),
+  ).optional(),
+  defaultSourceLabel: z.string().trim().min(1).max(240).optional(),
+  now: z.string().trim().min(1).max(80).optional(),
+  staleAfterDays: z.number().int().positive().max(366).optional(),
+}).strict().default({});
+
+export const ResourceViewEndpointRequestSchema = z.object({
+  entities: z.array(CoordinationEntitySchema).max(250_000).default([]),
+  resources: z.array(PublicResourceViewInputSchema).max(250_000).default([]),
+  view: ResourceViewOptionsSchema,
+}).strict();
+
+export type ResourceViewEndpointRequest = z.infer<typeof ResourceViewEndpointRequestSchema>;
+
+export interface ResourceViewEndpointResponse {
+  view: ResourceViewModel;
+}
+
+export function handleResourceViewEndpointRequest(
+  request: ResourceViewEndpointRequest,
+): ResourceViewEndpointResponse {
+  const parsed = ResourceViewEndpointRequestSchema.parse(request);
+  return {
+    view: buildResourceViewModel({
+      entities: parsed.entities,
+      resources: parsed.resources,
+    }, parsed.view),
   };
 }
 

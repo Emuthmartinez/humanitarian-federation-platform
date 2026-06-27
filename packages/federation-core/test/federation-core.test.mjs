@@ -10,6 +10,7 @@ import {
   assessPartnerScopes,
   buildCsvEmbeddingInputs,
   buildPublicFederationSnapshot,
+  buildResourceViewModel,
   csvRowToPersonRecord,
   createVertexMultimodalEmbeddingProvider,
   dedupeCsvPersonCsvText,
@@ -20,6 +21,7 @@ import {
   handleCsvDedupeEndpointRequest,
   handleGroupedPersonViewEndpointRequest,
   handlePublicDataIntakeEndpointRequest,
+  handleResourceViewEndpointRequest,
   hashPublicSnapshotContent,
   isSensitiveEmbeddingColumn,
   normalizeDomain,
@@ -615,6 +617,137 @@ t('coordination entity schema validates public channels and private address', ()
   assert.equal(redacted.countryCode, 'VE');
   assert.equal(redacted.lat, 10.067);
   assert.equal(redacted.lng, -69.347);
+});
+
+t('resource view endpoint groups outside support, needs, and hospital signals safely', () => {
+  const acopio = CoordinationEntitySchema.parse({
+    id: 'entity:usa-doral-acopio',
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'mapa-emergencia-rescate',
+    externalId: 'usa-doral-acopio',
+    sourceUrl: 'https://terremotovenezuela.app/apoyo-global',
+    kind: 'donation_center',
+    name: 'Centro de acopio Doral',
+    description: 'Recibe insumos para enviar a Venezuela.',
+    audienceScope: 'outside_venezuela',
+    countryCode: 'us',
+    admin1: 'Estados Unidos',
+    admin2: 'Doral, FL',
+    addressPrivate: 'private drop-off address',
+    channels: [{
+      type: 'supply_dropoff',
+      displayText: 'Recibe insumos medicos, agua y comida',
+      isPrimary: true,
+    }],
+    needs: [
+      { category: 'medical_supplies', title: 'Primeros auxilios', urgency: 'high' },
+      { category: 'food', title: 'Alimentos no perecederos', urgency: 'normal' },
+    ],
+    lastVerifiedAt: '2026-06-27T00:00:00Z',
+    updatedAt: '2026-06-27T00:00:00Z',
+  });
+  const hospital = CoordinationEntitySchema.parse({
+    id: 'entity:hospital-central',
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'hospital-directory',
+    externalId: 'hospital-central',
+    sourceUrl: 'https://terremotovenezuela.app/hospitales/hospital-central',
+    kind: 'hospital',
+    name: 'Hospital Central',
+    audienceScope: 'in_venezuela',
+    countryCode: 'VE',
+    admin1: 'Lara',
+    admin2: 'Barquisimeto',
+    lat: 10.06741,
+    lng: -69.34742,
+    addressPrivate: 'private hospital address',
+    channels: [{ type: 'website', url: 'https://hospital.example', isPrimary: true }],
+    needs: [{ category: 'beds', title: 'Camas disponibles', urgency: 'critical' }],
+    updatedAt: '2026-06-27T00:10:00Z',
+  });
+  const patientSignal = {
+    id: 'patient-signal:hospital-central:1',
+    eventId: 'venezuela-earthquakes-2026',
+    source: 'mapa-emergencia-rescate',
+    externalId: 'hospital-patient-1',
+    sourceUrl: 'https://terremotovenezuela.app/hospitales/hospital-central#paciente-1',
+    kind: 'patient_signal',
+    title: 'Paciente registrado en Hospital Central',
+    description: 'Proyeccion publica segura de un dato hospitalario para revision.',
+    audienceScope: 'in_venezuela',
+    countryCode: 'VE',
+    admin1: 'Lara',
+    admin2: 'Barquisimeto',
+    status: 'hospitalized',
+    urgency: 'high',
+    categories: ['medical_supplies'],
+    relationships: [{
+      type: 'patient_at_hospital',
+      targetId: 'entity:hospital-central',
+      label: 'Paciente en Hospital Central',
+    }],
+    updatedAt: '2026-06-27T00:15:00Z',
+  };
+
+  const response = handleResourceViewEndpointRequest({
+    entities: [acopio, hospital],
+    resources: [patientSignal],
+    view: {
+      sourceLabelById: {
+        'mapa-emergencia-rescate': 'Mapa Emergencia VE',
+        'hospital-directory': 'Directorio hospitalario',
+      },
+      now: '2026-06-27T00:20:00Z',
+      staleAfterDays: 3,
+    },
+  });
+
+  assert.equal(response.view.stats.resourcesTotal, 3);
+  assert.equal(response.view.stats.byAudience.outside_venezuela, 1);
+  assert.equal(response.view.stats.byAudience.in_venezuela, 2);
+  assert.equal(response.view.stats.byNeedCategory.medical_supplies, 2);
+  assert.equal(response.view.stats.byNeedCategory.beds, 1);
+  assert.equal(response.view.stats.urgentResources, 3);
+  assert.deepEqual(response.view.sections.find((section) => section.id === 'outside_venezuela')?.resourceIds, ['entity:usa-doral-acopio']);
+  assert.equal(response.view.sections.find((section) => section.id === 'health_and_patients')?.resourceIds.includes('patient-signal:hospital-central:1'), true);
+
+  const acopioCard = response.view.resources.find((resource) => resource.id === 'entity:usa-doral-acopio');
+  assert.equal(acopioCard?.audienceScope, 'outside_venezuela');
+  assert.equal(acopioCard?.countryCode, 'US');
+  assert.equal(acopioCard?.source.label, 'Mapa Emergencia VE');
+  assert.equal(acopioCard?.badges.some((badge) => badge.label === 'Fuera de Venezuela'), true);
+  assert.equal(acopioCard?.badges.some((badge) => badge.label === 'Necesidad urgente'), true);
+  assert.equal(acopioCard?.warnings.length, 0);
+
+  const hospitalCard = response.view.resources.find((resource) => resource.id === 'entity:hospital-central');
+  assert.equal(hospitalCard?.lat, 10.067);
+  assert.equal(hospitalCard?.lng, -69.347);
+
+  const patientCard = response.view.resources.find((resource) => resource.id === 'patient-signal:hospital-central:1');
+  assert.equal(patientCard?.warnings.some((warning) => warning.id === 'restricted_patient_projection'), true);
+
+  const builtDirectly = buildResourceViewModel({ entities: [acopio], resources: [patientSignal] });
+  assert.equal(builtDirectly.stats.resourcesTotal, 2);
+
+  const json = JSON.stringify(response.view);
+  for (const leak of ['private drop-off address', 'private hospital address', 'contactPrivate', 'contentFingerprint', 'medical chart']) {
+    assert.equal(json.includes(leak), false, `leaked ${leak}`);
+  }
+});
+
+t('resource view endpoint rejects private fields in public-safe resource inputs', () => {
+  assert.throws(() => handleResourceViewEndpointRequest({
+    resources: [{
+      id: 'resource:bad',
+      eventId: 'venezuela-earthquakes-2026',
+      source: 'site-a',
+      externalId: 'bad',
+      sourceUrl: 'https://site-a.example/bad',
+      kind: 'support_channel',
+      title: 'Bad resource',
+      contactPrivate: '+58 private phone',
+    }],
+  }), /Unrecognized key/);
 });
 
 t('public federation snapshot normalizes redacted records for mirrors', () => {
