@@ -113,8 +113,13 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
 
 ## API Use
 
-Hosted instances can call `dedupeCsvPersonCsvText(csvText, options)` from
-`@humanitarian-federation/core` to return the same JSON review queue used by the
-CLI, including `groups` for candidate people and `sourceRefs` for row/source
-traceability. Keep the endpoint authenticated, size-limited, and restricted to
-coordinators or verified partners.
+Hosted instances can call `handleCsvDedupeEndpointRequest` from
+`@humanitarian-federation/core` for `POST /api/v1/dedupe/csv`. The handler
+returns deterministic candidates and, when an `EmbeddingProvider` is injected,
+embedding-assisted candidates from the same restricted request. Keep the
+endpoint authenticated, size-limited, and restricted to coordinators or verified
+partners.
+
+Use `dedupeCsvPersonCsvText(csvText, options)` when an API only needs the
+deterministic JSON review queue used by the CLI, including `groups` for
+candidate people and `sourceRefs` for row/source traceability.

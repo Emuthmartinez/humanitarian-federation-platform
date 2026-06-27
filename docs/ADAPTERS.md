@@ -50,4 +50,7 @@ that value to an embedding provider.
 GCP-backed instances can use `createVertexMultimodalEmbeddingProvider` with
 Vertex AI `multimodalembedding@001`. Keep credentials server-side and pass the
 provider a short-lived access token or token callback; never put service account
-keys or partner API credentials in uploaded CSVs or public clients.
+keys or partner API credentials in uploaded CSVs or public clients. The helper
+defaults to one instance per Vertex request and strict review thresholds because
+similar rows in the same crisis spreadsheet can have a high baseline vector
+similarity.

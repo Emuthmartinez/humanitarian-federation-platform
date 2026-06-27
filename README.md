@@ -50,11 +50,19 @@ import {
   embedCsvRecords,
   FederatedPersonRecordSchema,
   findEmbeddingDuplicateCandidates,
+  handleCsvDedupeEndpointRequest,
+  handlePublicDataIntakeEndpointRequest,
   redactPersonRecord,
   scorePersonMatch,
   summarizePersonStatus,
 } from '@humanitarian-federation/core';
 ```
+
+For a no-key public dropbox route, call `handlePublicDataIntakeEndpointRequest`
+from a hosted `POST /api/v1/public-intake` endpoint. It accepts arbitrary JSON,
+CSV text, pasted text, or URLs, stores the raw submission for restricted
+operator review, and returns a redacted receipt instead of publishing unverified
+data.
 
 CSV uploads can be embedded for bulk duplicate review with a server-side
 provider. For GCP, `createVertexMultimodalEmbeddingProvider` calls Vertex AI
@@ -74,9 +82,10 @@ pnpm --filter @humanitarian-federation/core dedupe:csv -- people.csv \
   --rejects rejected-rows.csv
 ```
 
-Hosted APIs can call `dedupeCsvPersonCsvText` with the same options to return a
-JSON review queue matching the CLI output, including candidate person groups
-that preserve per-row source references.
+Hosted APIs can call `handleCsvDedupeEndpointRequest` for a restricted
+`POST /api/v1/dedupe/csv` flow, returning deterministic and optional
+embedding-assisted review candidates without exposing raw IDs, notes, contacts,
+or provider credentials.
 
 ## Repository Layout
 

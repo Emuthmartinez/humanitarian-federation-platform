@@ -183,9 +183,9 @@ const DEFAULT_SENSITIVE_COLUMN_MARKERS = [
   'whatsapp',
 ] as const;
 
-const DEFAULT_REVIEW_THRESHOLD = 0.72;
-const DEFAULT_POSSIBLE_THRESHOLD = 0.78;
-const DEFAULT_LIKELY_THRESHOLD = 0.88;
+const DEFAULT_REVIEW_THRESHOLD = 0.975;
+const DEFAULT_POSSIBLE_THRESHOLD = 0.985;
+const DEFAULT_LIKELY_THRESHOLD = 0.99;
 
 function normalizeColumnName(value: string): string {
   return value
