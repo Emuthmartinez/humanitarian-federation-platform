@@ -16,6 +16,8 @@ Each instance owns:
 - operational monitoring
 
 The platform repo owns shared contracts, docs, and deterministic helpers.
+It also owns the hosted-backend roadmap and parity criteria for any future
+reusable Hogar API service.
 
 ## Minimum Public Metadata
 
@@ -37,5 +39,17 @@ or incident-response contact details in the public manifest.
 
 ## First Instance
 
-Respuesta VE is the first instance. It proves the model for the June 2026
-Venezuela earthquakes while this repo keeps the reusable pieces generic.
+Respuesta VE is the first instance and current production compatibility host.
+It proves the model for the June 2026 Venezuela earthquakes while this repo
+keeps the reusable pieces generic.
+
+Current production API:
+
+```text
+https://respuestave.org/api/v1
+```
+
+Keep current partner integrations on that stable host until a Hogar-hosted API
+has parity tests, a staging deployment, and an explicit cutover plan. See
+[`PLATFORM_BOUNDARY.md`](PLATFORM_BOUNDARY.md) and
+[`HOSTED_BACKEND_ROADMAP.md`](HOSTED_BACKEND_ROADMAP.md).

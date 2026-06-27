@@ -1,8 +1,13 @@
 # API Contract
 
-The package defines contracts that a hosted instance can expose over HTTP. The
-current public proof is Respuesta VE's `/api/v1/*` routes; this document names
-the generic shape.
+The package defines contracts that a hosted instance can expose over HTTP.
+Respuesta VE currently serves the first production Hogar-compatible API at
+`https://respuestave.org/api/v1`; that live host is the compatibility reference
+for partner integrations while Hogar grows toward a reusable hosted backend.
+
+This document names the generic v1 contract. Partner apps should not change API
+hosts until a Hogar-hosted backend has parity tests, staging proof, and an
+explicit cutover plan.
 
 ## Public Data Intake
 

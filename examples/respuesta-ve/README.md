@@ -6,6 +6,10 @@ Respuesta VE is the first public instance proving this platform.
 - Public repo: [github.com/Emuthmartinez/respuesta-ve](https://github.com/Emuthmartinez/respuesta-ve)
 - API base: `https://respuestave.org/api/v1`
 
+It is also the current production compatibility host for Hogar API contracts.
+Partner surfaces should keep using this stable v1 host until a future
+Hogar-hosted API has parity tests, staging proof, and an explicit cutover plan.
+
 ## What It Implements
 
 - Public damage map and anonymous reports.
@@ -177,5 +181,6 @@ candidates; they are not confirmed merges.
 
 ## Boundary
 
-Respuesta VE owns the Venezuela-specific deploy, UX, Supabase schema, and
-operational details. This platform repo owns reusable contracts and helpers.
+Respuesta VE owns the Venezuela-specific deploy, UX, Supabase schema, current
+production API host, and operational details. This platform repo owns reusable
+contracts, helpers, safety rules, and the hosted-backend extraction roadmap.

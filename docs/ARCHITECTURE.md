@@ -9,6 +9,10 @@ Instance site
   - local language, forms, maps, moderation, deploy/runtime
   - example: Respuesta VE
 
+Current production compatibility host
+  - Respuesta VE serves https://respuestave.org/api/v1 today
+  - partner integrations keep using this stable v1 host for now
+
 Platform contracts
   - event/source/person/entity/badge schemas
   - restricted child tracing contracts and trust scopes
@@ -23,8 +27,10 @@ Future hosted platform
   - partner badge registry
 ```
 
-The current repo ships the platform contracts layer. It does not yet ship a
-hosted ledger service.
+The current repo ships the platform contracts layer and owns the hosted-backend
+roadmap. It does not yet ship a standalone reusable hosted API. Respuesta VE is
+the first production compatibility host for Hogar API contracts and remains the
+stable live API until a Hogar-hosted backend proves parity.
 
 ## Canonical Flow
 
@@ -35,6 +41,10 @@ hosted ledger service.
 5. Matching helpers produce candidate duplicates and conflict summaries.
 6. Trusted coordinators confirm merges, splits, resolutions, and partner badges.
 7. Instances can publish a hashable public snapshot for frontends and mirrors.
+
+Today, partner sites that need the first production host use
+`https://respuestave.org/api/v1`. A future Hogar-hosted API must match the
+public-safe v1 contract before any production cutover.
 
 Child protection tracing follows the same source-aware pattern, but public
 surfaces receive only intake signals or receipt status. Restricted child case

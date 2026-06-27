@@ -33,12 +33,17 @@ humanitarian-response sites should be able to use the same federation model.
 - Gives partner sites a badge model so they can show federation participation
   without implying government endorsement.
 
-## What This Platform Is Not Yet
+## Hosted Backend Status
 
-This repo is not yet a hosted multi-tenant backend. The current deliverable is
-the public platform foundation: contracts, core primitives, docs, and instance
-guidance. Hosted ledger APIs, admin UI, and managed sync workers are tracked in
-the roadmap.
+Respuesta VE currently serves the first production Hogar-compatible API at
+`https://respuestave.org/api/v1`. That live API is the compatibility reference
+for partner integrations while Hogar grows toward a reusable hosted backend.
+
+This repo does not yet ship a standalone multi-tenant hosted API. It owns the
+platform contracts, core primitives, safety rules, partner guidance, and hosted
+backend extraction roadmap. Partner apps should keep using the stable Respuesta
+VE v1 host until Hogar has parity tests, a staging deployment, and an explicit
+cutover plan.
 
 ## Quick Start
 
@@ -141,6 +146,8 @@ examples/respuesta-ve/     First-instance integration notes
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API Contract](docs/API_CONTRACT.md)
+- [Platform Boundary](docs/PLATFORM_BOUNDARY.md)
+- [Hosted Backend Roadmap](docs/HOSTED_BACKEND_ROADMAP.md)
 - [Public Snapshot](docs/PUBLIC_SNAPSHOT.md)
 - [Data Model](docs/DATA_MODEL.md)
 - [Trust Model](docs/TRUST_MODEL.md)

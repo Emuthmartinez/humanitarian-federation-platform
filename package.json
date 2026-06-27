@@ -6,7 +6,8 @@
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "build": "pnpm --filter @humanitarian-federation/core build",
-    "test": "pnpm --filter @humanitarian-federation/core test",
+    "test": "pnpm run test:docs && pnpm --filter @humanitarian-federation/core test",
+    "test:docs": "node test/docs-platform-boundary.test.mjs",
     "typecheck": "pnpm --filter @humanitarian-federation/core typecheck"
   },
   "devDependencies": {
