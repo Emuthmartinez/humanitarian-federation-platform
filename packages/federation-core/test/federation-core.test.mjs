@@ -14,7 +14,9 @@ import {
   embedCsvRecords,
   findCsvPersonDuplicateCandidates,
   findEmbeddingDuplicateCandidates,
+  buildGroupedPersonViewModel,
   handleCsvDedupeEndpointRequest,
+  handleGroupedPersonViewEndpointRequest,
   handlePublicDataIntakeEndpointRequest,
   isSensitiveEmbeddingColumn,
   normalizeDomain,
@@ -412,6 +414,74 @@ t('csv dedupe endpoint returns embedding candidates through injected provider', 
   assert.equal(response.embedding.candidates[0].left.displayName, 'Ana Araujo');
   assert.equal(JSON.stringify(response).includes('private note'), false);
   assert.equal(JSON.stringify(response).includes('V-12.345.678'), false);
+});
+
+const groupedSummaryCsvFixture = [
+  'group_id,group_sort_bucket,group_kind,group_confidence,has_ci,ci_normalized,ci_count,ci_conflict,report_rows,total_num_reportes,statuses,status_conflict,hospitals,fuentes_count,member_row_numbers,representative_name,representative_hospital,needs_moderation,moderation_decision,moderation_notes',
+  'g1,0,cedula,confirmed_by_ci,yes,V12345678,1,no,3,5,Desaparecido | Encontrado,no,Hospital Central,3,"2|3|4",Ana Araujo,Hospital Central,no,,',
+  'g2,1,candidate_match,likely,no,,0,no,2,2,Confirmado,yes,Hospital Norte,2,"5|6",Pedro Gomez,Hospital Norte,yes,accept,operator-only note',
+].join('\n');
+
+const groupedReportsCsvFixture = [
+  'group_id,group_sort_bucket,group_kind,group_confidence,group_has_ci,group_ci_normalized,group_ci_count,group_ci_conflict,group_report_rows,group_total_num_reportes,group_statuses,group_status_conflict,group_hospitals,group_fuentes_count,group_member_row_numbers,group_representative_name,group_representative_hospital,needs_moderation,moderation_decision,moderation_notes,row_number,source_id,external_id,Nombre,Apellido,CI,CI_normalized,Edad,Sexo,Hospital,NumReportes,Status,Fuentes,Notas',
+  'g1,0,cedula,confirmed_by_ci,yes,V12345678,1,no,3,5,Desaparecido | Encontrado,no,Hospital Central,3,"2|3|4",Ana Araujo,Hospital Central,no,,,2,source-a,a-1,Ana,Araujo,V-12.345.678,V12345678,31,F,Hospital Central,2,Desaparecido,"source text https://example.org/a-1",private note',
+  'g1,0,cedula,confirmed_by_ci,yes,V12345678,1,no,3,5,Desaparecido | Encontrado,no,Hospital Central,3,"2|3|4",Ana Araujo,Hospital Central,no,,,3,source-a,a-2,Ana Julia,Araujo,V-12.345.678,V12345678,31,F,Hospital Central,3,Encontrado,"source text https://example.org/a-2",private note',
+  'g2,1,candidate_match,likely,no,,0,no,2,2,Confirmado,yes,Hospital Norte,2,"5|6",Pedro Gomez,Hospital Norte,yes,accept,operator-only note,5,source-b,b-1,Pedro,Gomez,,,42,,Hospital Norte,1,Confirmado,"raw fuente https://example.org/b-1",private note',
+].join('\n');
+
+const groupedViewOptionsFixture = {
+  sourceLabelById: {
+    'source-a': 'Desaparecidos Terremoto',
+    'source-b': 'Hospital sheet',
+  },
+};
+
+t('grouped person view model matches card UI without leaking private fields', () => {
+  const view = buildGroupedPersonViewModel(
+    groupedSummaryCsvFixture,
+    groupedReportsCsvFixture,
+    groupedViewOptionsFixture,
+  );
+
+  assert.equal(view.stats.groupsTotal, 2);
+  assert.equal(view.stats.sourceRows, 3);
+  assert.equal(view.stats.reportsGathered, 7);
+  assert.equal(view.stats.groupsWithIdentifier, 1);
+  assert.equal(view.sections[0].id, 'identified_with_identifier');
+  assert.deepEqual(view.sections[0].groupIds, ['g1']);
+  assert.equal(view.groups[0].badges.some((badge) => badge.label === 'Cédula reportada'), true);
+  assert.equal(view.groups[0].badges.some((badge) => badge.label === 'Mismo registro · 3 reportes'), true);
+  assert.equal(view.groups[0].status.label, 'Desaparecido(a)');
+  assert.equal(view.groups[0].reports[0].source.label, 'Desaparecidos Terremoto');
+  assert.deepEqual(view.groups[0].reports[0].source.urls, ['https://example.org/a-1']);
+  assert.equal(view.groups[1].warnings.some((warning) => warning.id === 'status_conflict'), true);
+  const json = JSON.stringify(view);
+  for (const leak of ['V-12.345.678', 'V12345678', 'private note', 'source text ', 'raw fuente ', 'operator-only note', 'accept']) {
+    assert.equal(json.includes(leak), false, `leaked ${leak}`);
+  }
+});
+
+t('grouped person view endpoint returns a public-safe card payload', () => {
+  const response = handleGroupedPersonViewEndpointRequest({
+    groupSummaryCsvText: groupedSummaryCsvFixture,
+    groupedReportsCsvText: groupedReportsCsvFixture,
+    view: {
+      ...groupedViewOptionsFixture,
+      localizedStatusValues: ['Confirmado'],
+    },
+  });
+
+  assert.equal(response.view.stats.groupsTotal, 2);
+  assert.equal(response.view.stats.localizedReports, 1);
+  assert.deepEqual(response.view.sections.map((section) => section.id), [
+    'identified_with_identifier',
+    'needs_review',
+    'single_records',
+  ]);
+  const json = JSON.stringify(response.view);
+  for (const leak of ['CI_normalized', 'moderation_notes', 'operator-only note', 'raw fuente ']) {
+    assert.equal(json.includes(leak), false, `leaked ${leak}`);
+  }
 });
 
 t('public intake accepts arbitrary unauthenticated JSON and returns a safe receipt', () => {

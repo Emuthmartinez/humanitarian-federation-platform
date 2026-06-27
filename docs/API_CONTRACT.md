@@ -175,6 +175,42 @@ coordinates, child protection details, provider tokens, or raw source payloads.
 Every output row remains advisory and must lead to `coordinator_review`, not an
 automatic merge.
 
+## Grouped Person View Endpoint
+
+Hosted instances can expose a public-safe projection endpoint for already
+reviewed or review-ready grouped CSV exports:
+
+```text
+POST /api/v1/person-groups/view
+Content-Type: application/json
+Authorization: deployment-specific
+```
+
+Implementations can use `handleGroupedPersonViewEndpointRequest` from
+`@humanitarian-federation/core`. The request includes the group summary CSV, the
+grouped report rows CSV, and optional view settings such as source label maps or
+localized status values.
+
+```json
+{
+  "groupSummaryCsvText": "group_id,group_kind,has_ci,report_rows,statuses,...",
+  "groupedReportsCsvText": "group_id,row_number,source_id,Nombre,Apellido,Status,Fuentes,...",
+  "view": {
+    "sourceLabelById": {
+      "desaparecidos-terremoto": "Desaparecidos Terremoto"
+    },
+    "localizedStatusValues": ["Encontrado", "Encontrada", "Localizado"]
+  }
+}
+```
+
+The response is a card-oriented `view` payload with aggregate stats, ordered
+sections, public badges, status pills, conflict warnings, per-report source
+labels, and extracted http(s) source URLs. It deliberately omits raw identifier
+columns, normalized ID columns, private notes, raw source text, and moderation
+notes. Conflict warnings remain advisory; clients must not present grouped rows
+as confirmed merges unless a coordinator has reviewed them.
+
 ## Batch CSV Deterministic Dedupe
 
 Hosted instances can expose a restricted coordinator or verified-partner endpoint

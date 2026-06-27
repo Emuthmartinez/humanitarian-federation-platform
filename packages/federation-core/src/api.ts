@@ -20,6 +20,10 @@ import {
   type EmbeddingDuplicateCandidate,
   type EmbeddingProvider,
 } from './embeddings.js';
+import {
+  buildGroupedPersonViewModel,
+  type GroupedPersonViewModel,
+} from './grouped-view.js';
 
 const MAX_CSV_UPLOAD_BYTES = 20_000_000;
 const MAX_PUBLIC_INTAKE_PAYLOAD_CHARS = 5_000_000;
@@ -348,6 +352,44 @@ export function handlePublicDataIntakeEndpointRequest(
   return {
     submission,
     receipt: redactPublicDataIntakeSubmissionReceipt(submission),
+  };
+}
+
+const GroupedPersonViewOptionsSchema = z.object({
+  sourceLabelById: z.record(
+    z.string().trim().min(1).max(160),
+    z.string().trim().min(1).max(240),
+  ).optional(),
+  defaultSourceLabel: z.string().trim().min(1).max(240).optional(),
+  sourceUrlColumn: z.string().trim().min(1).max(160).optional(),
+  sourceLabelColumn: z.string().trim().min(1).max(160).optional(),
+  maxSourceUrlsPerReport: z.number().int().positive().max(20).optional(),
+  localizedStatusValues: z.array(z.string().trim().min(1).max(160)).max(80).optional(),
+  excludeModerationDecisions: z.array(z.string().trim().min(1).max(160)).max(80).optional(),
+}).strict().default({});
+
+export const GroupedPersonViewEndpointRequestSchema = z.object({
+  groupSummaryCsvText: z.string().min(1).max(MAX_CSV_UPLOAD_BYTES),
+  groupedReportsCsvText: z.string().min(1).max(MAX_CSV_UPLOAD_BYTES),
+  view: GroupedPersonViewOptionsSchema,
+}).strict();
+
+export type GroupedPersonViewEndpointRequest = z.infer<typeof GroupedPersonViewEndpointRequestSchema>;
+
+export interface GroupedPersonViewEndpointResponse {
+  view: GroupedPersonViewModel;
+}
+
+export function handleGroupedPersonViewEndpointRequest(
+  request: GroupedPersonViewEndpointRequest,
+): GroupedPersonViewEndpointResponse {
+  const parsed = GroupedPersonViewEndpointRequestSchema.parse(request);
+  return {
+    view: buildGroupedPersonViewModel(
+      parsed.groupSummaryCsvText,
+      parsed.groupedReportsCsvText,
+      parsed.view,
+    ),
   };
 }
 
