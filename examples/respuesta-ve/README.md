@@ -29,9 +29,28 @@ curl -X POST https://respuestave.org/api/v1/public-intake \
   -H 'content-type: application/json' \
   --data '{
     "source": "discord:respuesta-ve",
+    "sourceRecordId": "discord:respuesta-ve:message-123",
+    "contentFingerprint": "sha256:...",
     "submittedBy": "@your-discord-handle",
     "contact": "where coordinators can reply privately",
     "kind": "mixed",
+    "processingHints": {
+      "dedupeMode": "candidate_review_not_auto_merge",
+      "promotionPath": "/api/v1/persons",
+      "cleanupPipeline": ["extract_rows", "normalize_person", "match_person"]
+    },
+    "canonicalCandidates": [
+      {
+        "kind": "person",
+        "externalId": "discord:respuesta-ve:message-123:row-1",
+        "externalUrl": "https://example.org/source-row",
+        "record": {
+          "name": "Ana Araujo",
+          "estado": "La Guaira",
+          "status": "missing"
+        }
+      }
+    ],
     "note": "Scrape/process this for Respuesta VE",
     "data": {
       "url": "https://example.org/sheet-or-post",

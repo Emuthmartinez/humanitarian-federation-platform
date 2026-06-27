@@ -32,9 +32,35 @@ Recommended wrapped shape:
 ```json
 {
   "source": "discord:respuesta-ve",
+  "sourceRecordId": "discord:respuesta-ve:message-123",
+  "contentFingerprint": "sha256:...",
   "submittedBy": "@discord-user",
   "contact": "private reply contact if needed",
   "kind": "mixed",
+  "audienceScope": "in_venezuela",
+  "processingHints": {
+    "dedupeMode": "candidate_review_not_auto_merge",
+    "promotionPath": "/api/v1/persons",
+    "cleanupPipeline": [
+      "extract_rows",
+      "normalize_person",
+      "match_person",
+      "operator_promote_safe_records"
+    ]
+  },
+  "canonicalCandidates": [
+    {
+      "kind": "person",
+      "externalId": "discord:respuesta-ve:message-123:row-1",
+      "externalUrl": "https://source.example/message/123",
+      "record": {
+        "name": "Ana Araujo",
+        "age": 31,
+        "estado": "La Guaira",
+        "status": "missing"
+      }
+    }
+  ],
   "note": "Please scrape this sheet and process the rows.",
   "data": {
     "sheet": "https://example.org/public-hospital-sheet",
@@ -132,6 +158,22 @@ rows, or child protection details. No-key intake must still use rate limits,
 size limits, logging, abuse review, and a non-public queue. Intake data is not a
 federated record until an operator validates, maps, redacts, deduplicates, and
 publishes it through the normal write paths.
+
+If a caller can provide cleanup hints, store them only in the restricted queue:
+
+- `sourceRecordId`: stable, source-aware idempotency key.
+- `contentFingerprint`: restricted hash for repeated upload grouping. Do not
+  publish or expose it in receipts.
+- `processingHints`: suggested extraction, normalization, dedupe, and promotion
+  path.
+- `canonicalCandidates`: caller-supplied person/entity/need candidates already
+  mapped toward the instance schema.
+
+These fields help operators and workers choose deterministic cleanup steps, but
+they remain advisory. Promote people through the authenticated person write path,
+coordination entities and needs through the entity write path, and keep medical
+patient details, raw photos, private contacts, and child-protection claims
+restricted unless a coordinator creates a safe public projection.
 
 Processed canonical data is fetched separately. Partners with read scopes should
 poll the normal change feeds with a durable `since` cursor, for example

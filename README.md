@@ -70,6 +70,11 @@ instead of publishing unverified data. Submitters poll
 `GET /api/v1/public-intake?id=<receipt-id>` for queue status; verified partners
 poll canonical change feeds such as `/api/v1/persons/changes?since=...` and
 `/api/v1/entities/changes?since=...` after operators promote records.
+When callers can provide `sourceRecordId`, `contentFingerprint`,
+`processingHints`, and `canonicalCandidates`, preserve those inside the
+restricted review queue so operators/workers can dedupe and clean records before
+promoting them through canonical person or entity write paths. Do not expose
+those hints in receipts or public snapshots.
 
 For provider failover and frontend handoff, publish a redacted normalized
 snapshot with `buildPublicFederationSnapshot` at a stable URL such as

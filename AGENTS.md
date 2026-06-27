@@ -72,6 +72,10 @@ Key docs for current federation surfaces:
 - Validate external input with strict schemas.
 - Use source-aware and event-aware identifiers; never assume a source-local id
   is globally unique by itself.
+- For no-key public intake, preserve `sourceRecordId`, `contentFingerprint`,
+  `processingHints`, and `canonicalCandidates` in the restricted review record
+  when a caller provides them. These are cleanup/dedupe hints, not public
+  receipts and not canonical writes.
 - Build public snapshot outputs from whitelisted redaction helpers. Do not
   serialize raw intake payloads, private record fields, or unrestricted source
   rows into snapshot responses.
