@@ -118,7 +118,6 @@ export interface PublicDataIntakeReceipt {
   eventId: string;
   source: string;
   status: PublicIntakeReviewStatus;
-  authentication: 'none_required';
   submittedAt: string;
   updatedAt?: string;
   payloadFormat: PublicIntakePayloadFormat;
@@ -331,7 +330,6 @@ export function redactPublicDataIntakeSubmissionReceipt(
     eventId: submission.eventId,
     source: submission.source,
     status: submission.reviewStatus,
-    authentication: 'none_required',
     submittedAt: submission.submittedAt,
     updatedAt: submission.updatedAt ?? submission.submittedAt,
     payloadFormat: submission.payloadFormat,

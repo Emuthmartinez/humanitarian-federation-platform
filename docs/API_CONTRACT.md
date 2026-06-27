@@ -4,18 +4,16 @@ The package defines contracts that a hosted instance can expose over HTTP. The
 current public proof is Respuesta VE's `/api/v1/*` routes; this document names
 the generic shape.
 
-## Public No-Key Data Intake
+## Public Data Intake
 
-Hosted instances can expose a no-API-key dropbox for volunteers, Discord users,
+Hosted instances can expose a public intake queue for volunteers, Discord users,
 partner forwards, and quick scrape targets:
 
 ```text
 POST /api/v1/public-intake
 Content-Type: application/json
-Authorization: not required
 
 GET /api/v1/public-intake?id=<receipt-id>
-Authorization: not required
 ```
 
 This endpoint accepts any JSON body, including arrays, arbitrary objects,
@@ -54,9 +52,9 @@ Recommended wrapped shape:
       "externalId": "discord:respuesta-ve:message-123:row-1",
       "externalUrl": "https://source.example/message/123",
       "record": {
-        "name": "Ana Araujo",
+        "displayName": "Ana Araujo",
         "age": 31,
-        "estado": "La Guaira",
+        "admin1": "La Guaira",
         "status": "missing"
       }
     }
@@ -113,7 +111,6 @@ Safe receipt:
   "eventId": "venezuela-earthquakes-2026",
   "source": "discord:respuesta-ve",
   "status": "received_for_review",
-  "authentication": "none_required",
   "submittedAt": "2026-06-26T15:00:00.000Z",
   "payloadFormat": "json",
   "submissionKind": "mixed",
@@ -154,20 +151,36 @@ a canonical public record, the receipt can expose only a safe pointer:
 The stored submission is restricted operator data. It may contain private
 contacts or raw fields supplied by the sender, but the receipt must not echo
 names, contacts, notes, document identifiers, exact coordinates, raw payload
-rows, or child protection details. No-key intake must still use rate limits,
+rows, or child protection details. Public intake must still use rate limits,
 size limits, logging, abuse review, and a non-public queue. Intake data is not a
 federated record until an operator validates, maps, redacts, deduplicates, and
 publishes it through the normal write paths.
 
 If a caller can provide cleanup hints, store them only in the restricted queue:
 
-- `sourceRecordId`: stable, source-aware idempotency key.
+- `sourceRecordId`: stable source reference for advisory grouping and review;
+  do not rely on it for retry idempotency unless the hosted instance documents
+  that behavior separately.
 - `contentFingerprint`: restricted hash for repeated upload grouping. Do not
   publish or expose it in receipts.
 - `processingHints`: suggested extraction, normalization, dedupe, and promotion
   path.
 - `canonicalCandidates`: caller-supplied person/entity/need candidates already
-  mapped toward the instance schema.
+  mapped toward the instance schema. Candidate records should use canonical
+  write-contract field names, such as `displayName` and `admin1`, instead of
+  localized source labels.
+
+Outside-country donation and resource leads should also travel as entity
+candidates. Map diaspora collection centers as `kind: "donation_center"` or
+`kind: "supply_hub"`, donation links as `channels.type: "donation_url"`,
+drop-off instructions as `channels.type: "supply_dropoff"`, and needed items
+as `needs` with categories such as `medical_supplies`, `food`, `water`,
+`shelter`, or `funds`. Include `audienceScope: "outside_venezuela"` in the
+restricted intake wrapper. If the hosted instance has a dedicated `countryCode`
+field or donation-center table, preserve the country there; otherwise use the
+public entity geography fields for country/region (`admin1` or the
+instance-local `estado`) and city/state (`admin2` or `municipio`) until the
+instance adds first-class country fields to canonical entities.
 
 These fields help operators and workers choose deterministic cleanup steps, but
 they remain advisory. Promote people through the authenticated person write path,
@@ -188,7 +201,6 @@ and decentralized mirrors:
 
 ```text
 GET /api/v1/public-snapshot.json
-Authorization: not required for public records
 ```
 
 Implementations can use `buildPublicFederationSnapshot` from

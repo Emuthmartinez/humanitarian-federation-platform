@@ -488,7 +488,7 @@ t('grouped person view endpoint returns a public-safe card payload', () => {
   }
 });
 
-t('public intake accepts arbitrary unauthenticated JSON and returns a safe receipt', () => {
+t('public intake accepts arbitrary JSON and returns a safe receipt', () => {
   const response = handlePublicDataIntakeEndpointRequest({
     source: 'discord:respuesta-ve',
     submittedBy: '@volunteer',
@@ -516,7 +516,7 @@ t('public intake accepts arbitrary unauthenticated JSON and returns a safe recei
   assert.equal(response.submission.submissionKind, 'mixed');
   assert.equal(response.submission.payloadFormat, 'json');
   assert.deepEqual(response.submission.urlsToReview, ['https://example.org/public-hospital-sheet']);
-  assert.equal(response.receipt.authentication, 'none_required');
+  assert.equal('authentication' in response.receipt, false);
   assert.equal(response.receipt.urlCount, 1);
   assert.equal(response.receipt.message.includes('will not be published or merged automatically'), true);
   assert.equal(JSON.stringify(response.receipt).includes('+58 private phone'), false);
